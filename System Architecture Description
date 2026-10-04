@@ -1,0 +1,43 @@
+System Architecture Description
+
+The Minesweeper application is a browser-based game written in TypeScript. Project 2 extends the original Minesweeper project by adding artificial intelligence functionality while preserving the original game rules and board behavior.
+
+For the Easy AI portion of the project, the system was updated so that an AI player can randomly select valid covered squares on the same Minesweeper board used by the human player. The Easy AI does not analyze the number clues or hidden mine locations when choosing a move. Because of this, the Easy AI can randomly select a mine and lose the game.
+
+The application is separated into multiple components so that the user interface, AI behavior, turn management, and Minesweeper rules remain independent from each other.
+
+index.html provides the main HTML structure for the application. It contains the application container and loads the compiled JavaScript files. For Project 2, it was also updated to load ai-controls.css, which provides styling for the Easy AI controls.
+
+main.ts acts as the main entry point for the application. It handles navigation between the Minesweeper start screen and the active game screen.
+
+ui.ts is responsible for displaying the Minesweeper board and handling the user interface. For Project 2, the user interface was updated to include a Play Mode dropdown, a One Easy AI Move button, a Start AI button, a Pause AI button, and Easy AI status messages. Player actions are routed through the AI controller so that the system can determine whether the player or AI is currently allowed to make a move.
+
+ai-controller.ts was added for Project 2 and controls when the player and Easy AI are allowed to act. The controller supports three play modes: Manual, Player + Easy AI alternating turns, and Automatic Easy AI. In alternating mode, the player makes one move and the Easy AI automatically makes one move after approximately 500 milliseconds. In automatic mode, the Easy AI continues making moves until the game is won, lost, or paused. The controller also prevents multiple AI timers from running at the same time and stops pending AI actions when a new game is started.
+
+game.ts contains the main Minesweeper game logic. The original project uses this file for board creation, mine placement, revealing cells, revealing neighboring empty cells, flagging cells, win detection, and loss detection. For Project 2, the makeEasyAIMove() function was added. This function scans the board for cells whose state is covered, stores their coordinates, randomly selects one of those cells, and then calls the existing revealCell() function. This allows the Easy AI to reuse the original Minesweeper rules instead of duplicating game logic.
+
+types.ts contains the shared data structures used by the application, including the Board, Cell, CellState, and GameStatus types. The human player and Easy AI operate on the same Board object.
+
+ai-controls.css was added to style the Easy AI interface, including the play mode dropdown, AI buttons, status messages, and responsive layout.
+
+The Easy AI data flow follows this structure:
+
+User Interface
+    ↓
+AI Controller
+    ↓
+Easy AI Decision Logic
+    ↓
+Minesweeper Game Logic
+    ↓
+Board Updated
+    ↓
+User Interface Redrawn
+
+The Easy AI algorithm works by scanning the board for covered cells, storing all valid coordinates, randomly choosing one of those coordinates, and calling revealCell() on the selected square. The AI does not inspect hidden mine information when making its decision.
+
+The original Minesweeper tests were preserved to make sure the existing functionality was not broken. Two new test files, easy-ai.test.ts and ai-controller.test.ts, were added to test the Easy AI and controller functionality. The tests verify behavior including valid AI moves, avoiding flagged cells, stopping after a win or loss, selecting a mine, alternating turns, automatic AI play, pausing the AI, preventing duplicate AI loops, and controller cleanup.
+
+After implementation, the complete automated test suite produced 22 passing tests and 0 failing tests. The Easy AI was also manually tested in the browser using Manual, Player + Easy AI Turns, and Automatic Easy AI modes.
+
+This architecture separates the Minesweeper game rules, AI decision logic, turn management, and user interface into different components. This makes the system easier to maintain and allows additional AI difficulty levels to be integrated later without rewriting the original Minesweeper game logic.

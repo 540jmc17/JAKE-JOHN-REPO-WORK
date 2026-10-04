@@ -1,0 +1,1687 @@
+/*
+ * Module Name: ui.ts
+ * Description: Renders the Minesweeper start screen/game and connects user input,
+ * Easy AI controls, status messages, and board redraws to the game controller.
+ *
+ * Inputs: DOM from index.html, selected mine count, input events, new-game callback.
+ *
+ * Outputs: Updated browser DOM; board changes are delegated to
+ * AIController/game.ts.
+ *
+ * Original Authors: Aayush Gajakas and Aiman Boullaouz
+ * Original Creation Date: September 15, 2026
+ *
+ * Project 2 Addition:
+ * Easy AI UI controls and AIController integration.
+ *
+ * Jake Crawford + John
+ */
+
+import { createGame } from './game.js';
+
+import {
+    AIController,
+    type PlayMode
+} from './ai-controller.js';
+
+import {
+    MAX_MINES,
+    MIN_MINES,
+    coordToLabel,
+    type Board
+} from './types.js';
+
+
+/* ============================================================
+   TYPES
+   ============================================================ */
+
+type StartGameHandler =
+    (mineCount: number) => void;
+
+type NewGameHandler =
+    () => void;
+
+
+/* ============================================================
+   SCREEN CLEANUP
+   ============================================================ */
+
+/**
+ * Stores cleanup logic for the currently active game.
+ *
+ * This is important because the Easy AI can have
+ * timers running in the background.
+ *
+ * When the player starts a new game, those old
+ * timers need to be cancelled.
+ */
+let cleanupActiveGame:
+    (() => void) |
+    undefined;
+
+
+/**
+ * Cleans up the previous game screen.
+ *
+ * This prevents an old AI controller from continuing
+ * to make moves after a new game has started.
+ */
+function cleanupPreviousScreen(): void {
+
+    cleanupActiveGame?.();
+
+    cleanupActiveGame =
+        undefined;
+}
+
+
+/* ============================================================
+   APP CONTAINER
+   ============================================================ */
+
+/**
+ * Finds the main #app element from index.html.
+ *
+ * @returns
+ * The application's main HTML container.
+ */
+function getApp(): HTMLElement {
+
+    const app =
+        document.getElementById('app');
+
+
+    if (!app) {
+
+        throw new Error(
+            'App container was not found.'
+        );
+    }
+
+
+    return app;
+}
+
+
+/* ============================================================
+   DOM ELEMENT HELPER
+   ============================================================ */
+
+/**
+ * Creates an HTML element with a class and
+ * optional text.
+ *
+ * This helper comes from the original UI design.
+ */
+function createElement<
+    K extends keyof HTMLElementTagNameMap
+>(
+    tagName: K,
+    className: string,
+    text?: string
+): HTMLElementTagNameMap[K] {
+
+    const element =
+        document.createElement(tagName);
+
+
+    element.className =
+        className;
+
+
+    if (text) {
+
+        element.textContent =
+            text;
+    }
+
+
+    return element;
+}
+
+
+/* ============================================================
+   START SCREEN
+   ============================================================ */
+
+/**
+ * Displays the original Minesweeper start screen.
+ *
+ * The player selects the number of mines and then
+ * presses Start Game.
+ */
+export function renderStartScreen(
+    onStart: StartGameHandler
+): void {
+
+    /**
+     * Make sure an old game and AI controller
+     * are shut down first.
+     */
+    cleanupPreviousScreen();
+
+
+    const app =
+        getApp();
+
+
+    app.replaceChildren();
+
+
+    document.body.classList.add(
+        'start-page'
+    );
+
+
+    document.body.classList.remove(
+        'game-page'
+    );
+
+
+    /* --------------------------------------------------------
+       MAIN START SCREEN
+       -------------------------------------------------------- */
+
+    const shell =
+        createElement(
+            'div',
+            'start-shell'
+        );
+
+
+    const intro =
+        createElement(
+            'section',
+            'start-intro'
+        );
+
+
+    const title =
+        createElement(
+            'h1',
+            'brand-title',
+            'Minesweeper'
+        );
+
+
+    intro.append(
+        title
+    );
+
+
+    /* --------------------------------------------------------
+       SETUP PANEL
+       -------------------------------------------------------- */
+
+    const setup =
+        createElement(
+            'section',
+            'setup-panel'
+        );
+
+
+    const setupHeading =
+        createElement(
+            'h2',
+            'panel-title',
+            'Choose mines'
+        );
+
+
+    /* --------------------------------------------------------
+       MINE SLIDER
+       -------------------------------------------------------- */
+
+    const minePicker =
+        createElement(
+            'label',
+            'mine-picker'
+        );
+
+
+    const mineReadout =
+        createElement(
+            'div',
+            'mine-readout'
+        );
+
+
+    const mineCount =
+        createElement(
+            'output',
+            'mine-count',
+            '15'
+        );
+
+
+    const mineLabel =
+        createElement(
+            'span',
+            'mine-label',
+            'mines'
+        );
+
+
+    const mineRange =
+        document.createElement(
+            'input'
+        );
+
+
+    mineRange.type =
+        'range';
+
+
+    mineRange.min =
+        String(MIN_MINES);
+
+
+    mineRange.max =
+        String(MAX_MINES);
+
+
+    mineRange.value =
+        '15';
+
+
+    mineRange.setAttribute(
+        'aria-label',
+        'Number of mines slider'
+    );
+
+
+    /**
+     * Update the displayed number whenever
+     * the slider moves.
+     */
+    mineRange.addEventListener(
+        'input',
+        () => {
+
+            mineCount.textContent =
+                mineRange.value;
+        }
+    );
+
+
+    mineReadout.append(
+        mineCount,
+        mineLabel
+    );
+
+
+    minePicker.append(
+        mineReadout,
+        mineRange
+    );
+
+
+    /* --------------------------------------------------------
+       START BUTTON
+       -------------------------------------------------------- */
+
+    const startButton =
+        createElement(
+            'button',
+            'start-button',
+            'Start game'
+        );
+
+
+    startButton.type =
+        'button';
+
+
+    startButton.addEventListener(
+        'click',
+        () => {
+
+            onStart(
+                Number(
+                    mineRange.value
+                )
+            );
+        }
+    );
+
+
+    /* --------------------------------------------------------
+       INSTRUCTIONS
+       -------------------------------------------------------- */
+
+    const instructions =
+        createElement(
+            'div',
+            'instructions'
+        );
+
+
+    instructions.innerHTML =
+        `
+        <span class="instruction-icon">?</span>
+
+        <div>
+            <strong>How to play</strong>
+
+            <ul>
+                <li>Reveal every safe square.</li>
+                <li>Use numbers to spot nearby mines.</li>
+                <li>Right-click to flag a suspected mine.</li>
+            </ul>
+        </div>
+        `;
+
+
+    setup.append(
+        setupHeading,
+        minePicker,
+        startButton,
+        instructions
+    );
+
+
+    shell.append(
+        intro,
+        setup
+    );
+
+
+    app.append(
+        shell
+    );
+}
+
+
+/* ============================================================
+   BOARD RENDERING
+   ============================================================ */
+
+/**
+ * Draws the current Minesweeper board.
+ *
+ * IMPORTANT:
+ *
+ * Player clicks now go through AIController.
+ *
+ * This allows the controller to prevent the player
+ * from moving when it is currently the AI's turn.
+ */
+function renderBoard(
+    boardData: Board,
+    controller: AIController
+): HTMLElement {
+
+    const board =
+        createElement(
+            'div',
+            'board'
+        );
+
+
+    board.id =
+        'board';
+
+
+    board.style.gridTemplateColumns =
+        `repeat(${boardData.cols}, 1fr)`;
+
+
+    board.setAttribute(
+        'aria-label',
+        'Minesweeper board'
+    );
+
+
+    /* --------------------------------------------------------
+       LOOP THROUGH BOARD
+       -------------------------------------------------------- */
+
+    for (
+        let row = 0;
+        row < boardData.rows;
+        row++
+    ) {
+
+        for (
+            let col = 0;
+            col < boardData.cols;
+            col++
+        ) {
+
+            const cell =
+                createElement(
+                    'div',
+                    'cell'
+                );
+
+
+            const cellData =
+                boardData.cells[row][col];
+
+
+            cell.dataset.row =
+                String(row);
+
+
+            cell.dataset.col =
+                String(col);
+
+
+            /* ------------------------------------------------
+               CELL DISPLAY
+               ------------------------------------------------ */
+
+            let description:
+                string =
+                cellData.state;
+
+
+            /**
+             * Show revealed cells.
+             */
+            if (
+                cellData.state ===
+                'revealed'
+            ) {
+
+                cell.classList.add(
+                    'revealed'
+                );
+
+
+                /**
+                 * Mine was revealed.
+                 */
+                if (
+                    cellData.isMine
+                ) {
+
+                    cell.textContent =
+                        '*';
+
+
+                    cell.classList.add(
+                        'mine'
+                    );
+
+
+                    description =
+                        'revealed mine';
+                }
+
+
+                /**
+                 * Numbered cell.
+                 */
+                else if (
+                    cellData.adjacentMines > 0
+                ) {
+
+                    cell.textContent =
+                        String(
+                            cellData.adjacentMines
+                        );
+
+
+                    cell.classList.add(
+                        `number-${cellData.adjacentMines}`
+                    );
+
+
+                    description =
+                        `${cellData.adjacentMines} adjacent mines`;
+                }
+
+
+                /**
+                 * Empty safe square.
+                 */
+                else {
+
+                    description =
+                        'revealed empty square';
+                }
+            }
+
+
+            /**
+             * Show flagged cells.
+             */
+            else if (
+                cellData.state ===
+                'flagged'
+            ) {
+
+                cell.textContent =
+                    '⚑';
+
+
+                cell.classList.add(
+                    'flagged'
+                );
+            }
+
+
+            /* ------------------------------------------------
+               PLAYER INPUT PERMISSIONS
+               ------------------------------------------------ */
+
+            /**
+             * A cell can only be interacted with when:
+             *
+             * - The controller says the player can act.
+             * - The cell has not already been revealed.
+             */
+            const enabled =
+                controller.canPlayerAct &&
+                cellData.state !==
+                    'revealed';
+
+
+            cell.setAttribute(
+                'role',
+                'button'
+            );
+
+
+            cell.setAttribute(
+                'aria-label',
+                `${coordToLabel({ row, col })}: ${description}`
+            );
+
+
+            cell.setAttribute(
+                'aria-disabled',
+                String(!enabled)
+            );
+
+
+            cell.tabIndex =
+                enabled
+                    ? 0
+                    : -1;
+
+
+            /* ------------------------------------------------
+               LEFT CLICK
+               ------------------------------------------------ */
+
+            /**
+             * LEFT CLICK:
+             *
+             * Ask AIController to reveal the cell.
+             *
+             * We no longer directly call revealCell()
+             * from the UI.
+             */
+            cell.addEventListener(
+                'click',
+                () => {
+
+                    controller.reveal(
+                        row,
+                        col
+                    );
+                }
+            );
+
+
+            /* ------------------------------------------------
+               RIGHT CLICK
+               ------------------------------------------------ */
+
+            /**
+             * RIGHT CLICK:
+             *
+             * Toggle a flag using AIController.
+             */
+            cell.addEventListener(
+                'contextmenu',
+                (event) => {
+
+                    event.preventDefault();
+
+
+                    controller.flag(
+                        row,
+                        col
+                    );
+                }
+            );
+
+
+            /* ------------------------------------------------
+               KEYBOARD CONTROLS
+               ------------------------------------------------ */
+
+            cell.addEventListener(
+                'keydown',
+                (event) => {
+
+                    /**
+                     * ENTER or SPACE reveals a cell.
+                     */
+                    if (
+                        event.key ===
+                            'Enter' ||
+                        event.key ===
+                            ' '
+                    ) {
+
+                        event.preventDefault();
+
+
+                        controller.reveal(
+                            row,
+                            col
+                        );
+                    }
+
+
+                    /**
+                     * F toggles a flag.
+                     */
+                    else if (
+                        event.key
+                            .toLowerCase() ===
+                        'f'
+                    ) {
+
+                        event.preventDefault();
+
+
+                        controller.flag(
+                            row,
+                            col
+                        );
+                    }
+                }
+            );
+
+
+            board.append(
+                cell
+            );
+        }
+    }
+
+
+    return board;
+}
+
+
+/* ============================================================
+   WIN CELEBRATION
+   ============================================================ */
+
+/**
+ * Displays the inherited confetti celebration
+ * when the player or AI wins.
+ *
+ * Project 2 adds cleanup support so the animation
+ * can be stopped when a new game begins.
+ */
+function showWinCelebration(
+    app: HTMLElement
+): () => void {
+
+    const celebration =
+        createElement(
+            'div',
+            'win-celebration'
+        );
+
+
+    const message =
+        createElement(
+            'div',
+            'win-celebration-message',
+            'YOU WIN'
+        );
+
+
+    const canvas =
+        document.createElement(
+            'canvas'
+        );
+
+
+    canvas.className =
+        'confetti-canvas';
+
+
+    celebration.append(
+        canvas,
+        message
+    );
+
+
+    app.append(
+        celebration
+    );
+
+
+    const context =
+        canvas.getContext(
+            '2d'
+        );
+
+
+    /**
+     * If the browser cannot create a
+     * Canvas drawing context, simply return
+     * cleanup logic.
+     */
+    if (!context) {
+
+        return () =>
+            celebration.remove();
+    }
+
+
+    /* --------------------------------------------------------
+       CONFETTI SETTINGS
+       -------------------------------------------------------- */
+
+    const colors = [
+        '#ff8ad8',
+        '#d8a7ff',
+        '#a9e5ff',
+        '#fff0a6'
+    ];
+
+
+    const particles =
+        Array.from(
+            {
+                length: 180
+            },
+            () => ({
+                x:
+                    Math.random() *
+                    window.innerWidth,
+
+                y:
+                    -Math.random() *
+                    window.innerHeight,
+
+                size:
+                    5 +
+                    Math.random() *
+                    7,
+
+                speed:
+                    2 +
+                    Math.random() *
+                    4,
+
+                drift:
+                    (
+                        Math.random() -
+                        0.5
+                    ) * 2,
+
+                rotation:
+                    Math.random() *
+                    Math.PI,
+
+                rotationSpeed:
+                    (
+                        Math.random() -
+                        0.5
+                    ) * 0.2,
+
+                color:
+                    colors[
+                        Math.floor(
+                            Math.random() *
+                            colors.length
+                        )
+                    ]
+            })
+        );
+
+
+    /**
+     * Keep canvas size equal to the browser window.
+     */
+    const resizeCanvas =
+        (): void => {
+
+            canvas.width =
+                window.innerWidth;
+
+
+            canvas.height =
+                window.innerHeight;
+        };
+
+
+    resizeCanvas();
+
+
+    window.addEventListener(
+        'resize',
+        resizeCanvas
+    );
+
+
+    let animationFrame =
+        0;
+
+
+    /* --------------------------------------------------------
+       CONFETTI ANIMATION
+       -------------------------------------------------------- */
+
+    const animate =
+        (): void => {
+
+            context.clearRect(
+                0,
+                0,
+                canvas.width,
+                canvas.height
+            );
+
+
+            for (
+                const particle
+                of particles
+            ) {
+
+                context.save();
+
+
+                context.translate(
+                    particle.x,
+                    particle.y
+                );
+
+
+                context.rotate(
+                    particle.rotation
+                );
+
+
+                context.fillStyle =
+                    particle.color;
+
+
+                context.fillRect(
+                    -particle.size / 2,
+                    -particle.size / 2,
+                    particle.size,
+                    particle.size * 0.65
+                );
+
+
+                context.restore();
+
+
+                particle.y +=
+                    particle.speed;
+
+
+                particle.x +=
+                    particle.drift;
+
+
+                particle.rotation +=
+                    particle.rotationSpeed;
+            }
+
+
+            /**
+             * Continue animation while particles
+             * remain on the screen.
+             */
+            if (
+                particles.some(
+                    (particle) =>
+                        particle.y <
+                        canvas.height + 20
+                )
+            ) {
+
+                animationFrame =
+                    window.requestAnimationFrame(
+                        animate
+                    );
+            }
+
+            else {
+
+                window.removeEventListener(
+                    'resize',
+                    resizeCanvas
+                );
+            }
+        };
+
+
+    animationFrame =
+        window.requestAnimationFrame(
+            animate
+        );
+
+
+    /* --------------------------------------------------------
+       CELEBRATION CLEANUP
+       -------------------------------------------------------- */
+
+    return () => {
+
+        window.cancelAnimationFrame(
+            animationFrame
+        );
+
+
+        window.removeEventListener(
+            'resize',
+            resizeCanvas
+        );
+
+
+        celebration.remove();
+    };
+}
+
+
+/* ============================================================
+   GAME SCREEN
+   ============================================================ */
+
+/**
+ * Creates the game screen.
+ *
+ * Project 2 adds:
+ *
+ * - One Easy AI move button
+ * - Player + Easy AI alternating mode
+ * - Automatic Easy AI mode
+ * - Start AI button
+ * - Pause AI button
+ * - AI status messages
+ *
+ * ONE Board and ONE AIController are used throughout
+ * the entire game.
+ */
+export function renderGameScreen(
+    mineCount: number,
+    onNewGame: NewGameHandler
+): void {
+
+    /* --------------------------------------------------------
+       PREPARE SCREEN
+       -------------------------------------------------------- */
+
+    cleanupPreviousScreen();
+
+
+    const app =
+        getApp();
+
+
+    app.replaceChildren();
+
+
+    document.body.classList.add(
+        'game-page'
+    );
+
+
+    document.body.classList.remove(
+        'start-page'
+    );
+
+
+    window.scrollTo(
+        0,
+        0
+    );
+
+
+    /* --------------------------------------------------------
+       CREATE GAME
+       -------------------------------------------------------- */
+
+    const gameBoard =
+        createGame(
+            mineCount
+        );
+
+
+    const gameShell =
+        createElement(
+            'div',
+            'game-shell'
+        );
+
+
+    const gameHeading =
+        createElement(
+            'div',
+            'game-heading'
+        );
+
+
+    gameHeading.innerHTML =
+        '<h1>Find the safe squares</h1>';
+
+
+    const stats =
+        createElement(
+            'div',
+            'game-stats'
+        );
+
+
+    const gameMessage =
+        createElement(
+            'div',
+            'game-message'
+        );
+
+
+    const boardHost =
+        createElement(
+            'div',
+            'board-host'
+        );
+
+
+    const boardFrame =
+        createElement(
+            'section',
+            'board-frame'
+        );
+
+
+    let celebrationShown =
+        false;
+
+
+    let cleanupCelebration:
+        (() => void) |
+        undefined;
+
+
+    /* ========================================================
+       EASY AI CONTROLS
+       ======================================================== */
+
+    /**
+     * These controls are created once.
+     *
+     * The board itself can redraw after every move
+     * without rebuilding the dropdown/buttons.
+     */
+    const controls =
+        createElement(
+            'section',
+            'ai-controls'
+        );
+
+
+    controls.setAttribute(
+        'aria-label',
+        'Easy AI controls'
+    );
+
+
+    /* --------------------------------------------------------
+       CONTROL TITLE
+       -------------------------------------------------------- */
+
+    const controlTitle =
+        createElement(
+            'h2',
+            'ai-title',
+            'Easy AI — random moves'
+        );
+
+
+    /* --------------------------------------------------------
+       MODE SELECTOR
+       -------------------------------------------------------- */
+
+    const modeLabel =
+        createElement(
+            'label',
+            'ai-mode-label',
+            'Play mode'
+        );
+
+
+    modeLabel.htmlFor =
+        'ai-mode';
+
+
+    const modeSelect =
+        createElement(
+            'select',
+            'ai-mode-select'
+        );
+
+
+    modeSelect.id =
+        'ai-mode';
+
+
+    /**
+     * Available game modes.
+     */
+    const modes:
+        Array<
+            [
+                PlayMode,
+                string
+            ]
+        > = [
+
+            [
+                'manual',
+                'Manual / one AI move'
+            ],
+
+            [
+                'alternating',
+                'Player + Easy AI turns'
+            ],
+
+            [
+                'automatic',
+                'Automatic Easy AI'
+            ]
+        ];
+
+
+    /**
+     * Add each mode to the dropdown.
+     */
+    for (
+        const [
+            value,
+            label
+        ] of modes
+    ) {
+
+        const option =
+            document.createElement(
+                'option'
+            );
+
+
+        option.value =
+            value;
+
+
+        option.textContent =
+            label;
+
+
+        modeSelect.append(
+            option
+        );
+    }
+
+
+    /* --------------------------------------------------------
+       AI BUTTONS
+       -------------------------------------------------------- */
+
+    const buttons =
+        createElement(
+            'div',
+            'ai-buttons'
+        );
+
+
+    /**
+     * ONE AI MOVE
+     */
+    const stepButton =
+        createElement(
+            'button',
+            'ai-button',
+            'One Easy AI move'
+        );
+
+
+    stepButton.id =
+        'ai-step';
+
+
+    /**
+     * START AUTOMATIC AI
+     */
+    const startAutoButton =
+        createElement(
+            'button',
+            'ai-button',
+            'Start AI'
+        );
+
+
+    startAutoButton.id =
+        'ai-start';
+
+
+    /**
+     * PAUSE AUTOMATIC AI
+     */
+    const pauseButton =
+        createElement(
+            'button',
+            'ai-button',
+            'Pause AI'
+        );
+
+
+    pauseButton.id =
+        'ai-pause';
+
+
+    /**
+     * Explicitly mark all buttons as normal
+     * buttons instead of submit buttons.
+     */
+    for (
+        const button of [
+            stepButton,
+            startAutoButton,
+            pauseButton
+        ]
+    ) {
+
+        button.type =
+            'button';
+    }
+
+
+    buttons.append(
+        stepButton,
+        startAutoButton,
+        pauseButton
+    );
+
+
+    /* --------------------------------------------------------
+       AI STATUS
+       -------------------------------------------------------- */
+
+    const aiStatus =
+        createElement(
+            'p',
+            'ai-status'
+        );
+
+
+    aiStatus.id =
+        'ai-status';
+
+
+    aiStatus.setAttribute(
+        'role',
+        'status'
+    );
+
+
+    aiStatus.setAttribute(
+        'aria-live',
+        'polite'
+    );
+
+
+    /* --------------------------------------------------------
+       HELP TEXT
+       -------------------------------------------------------- */
+
+    const help =
+        createElement(
+            'p',
+            'ai-help',
+            'Easy AI can hit a mine. In turn mode, a successful reveal or flag/unflag uses your turn. Keyboard: Enter/Space to reveal; F to flag.'
+        );
+
+
+    controls.append(
+        controlTitle,
+        modeLabel,
+        modeSelect,
+        buttons,
+        aiStatus,
+        help
+    );
+
+
+    /* ========================================================
+       CREATE AI CONTROLLER
+       ======================================================== */
+
+    /**
+     * Create ONE controller for this game.
+     *
+     * updateGameView() will be called whenever
+     * the player or AI changes the board.
+     */
+    const controller =
+        new AIController(
+            gameBoard,
+            updateGameView
+        );
+
+
+    /**
+     * When this game screen is replaced:
+     *
+     * - Stop AI timers
+     * - Stop confetti animation
+     */
+    cleanupActiveGame =
+        () => {
+
+            controller.dispose();
+
+
+            cleanupCelebration?.();
+        };
+
+
+    /* ========================================================
+       MODE SELECTOR EVENT
+       ======================================================== */
+
+    modeSelect.addEventListener(
+        'change',
+        () => {
+
+            const value =
+                modeSelect.value;
+
+
+            /**
+             * Only allow known game modes.
+             */
+            if (
+                value === 'manual' ||
+                value === 'alternating' ||
+                value === 'automatic'
+            ) {
+
+                controller.setMode(
+                    value
+                );
+            }
+        }
+    );
+
+
+    /* ========================================================
+       EASY AI BUTTON EVENTS
+       ======================================================== */
+
+    /**
+     * Make ONE Easy AI move.
+     */
+    stepButton.addEventListener(
+        'click',
+        () => {
+
+            controller.step();
+        }
+    );
+
+
+    /**
+     * Start automatic Easy AI.
+     */
+    startAutoButton.addEventListener(
+        'click',
+        () => {
+
+            controller.startAuto();
+        }
+    );
+
+
+    /**
+     * Pause automatic Easy AI.
+     */
+    pauseButton.addEventListener(
+        'click',
+        () => {
+
+            controller.pauseAuto();
+        }
+    );
+
+
+    /* ========================================================
+       UPDATE GAME VIEW
+       ======================================================== */
+
+    /**
+     * Refreshes everything displayed on screen
+     * after a player move, AI move, or mode change.
+     */
+    function updateGameView(): void {
+
+        /* ----------------------------------------------------
+           FLAG / MINE COUNT
+           ---------------------------------------------------- */
+
+        const flaggedCount =
+            gameBoard.cells
+                .flat()
+                .filter(
+                    (cell) =>
+                        cell.state ===
+                        'flagged'
+                )
+                .length;
+
+
+        const remainingMines =
+            gameBoard.mineCount -
+            flaggedCount;
+
+
+        /* ----------------------------------------------------
+           GAME STATS
+           ---------------------------------------------------- */
+
+        stats.innerHTML =
+            `
+            <div>
+                <span>Mines</span>
+                <strong>${remainingMines}</strong>
+            </div>
+
+            <button
+                class="new-game-button"
+                type="button"
+            >
+                New game
+            </button>
+            `;
+
+
+        /* ----------------------------------------------------
+           NEW GAME BUTTON
+           ---------------------------------------------------- */
+
+        stats
+            .querySelector<HTMLButtonElement>(
+                '.new-game-button'
+            )
+            ?.addEventListener(
+                'click',
+                () => {
+
+                    /**
+                     * Stop the old AI before
+                     * opening the new game screen.
+                     */
+                    cleanupPreviousScreen();
+
+
+                    onNewGame();
+                }
+            );
+
+
+        /* ----------------------------------------------------
+           WIN / LOSS MESSAGE
+           ---------------------------------------------------- */
+
+        gameMessage.textContent =
+
+            gameBoard.gameStatus ===
+                'won'
+
+                ? 'YOU WIN'
+
+                : gameBoard.gameStatus ===
+                    'lost'
+
+                    ? 'GAME OVER'
+
+                    : '';
+
+
+        gameMessage.className =
+            `game-message ${gameBoard.gameStatus}`;
+
+
+        /* ----------------------------------------------------
+           DETERMINE IF GAME FINISHED
+           ---------------------------------------------------- */
+
+        const finished =
+            gameBoard.gameStatus ===
+                'won' ||
+
+            gameBoard.gameStatus ===
+                'lost';
+
+
+        /* ----------------------------------------------------
+           UPDATE AI CONTROLS
+           ---------------------------------------------------- */
+
+        modeSelect.value =
+            controller.mode;
+
+
+        /**
+         * Player cannot change AI modes after
+         * the game has finished.
+         */
+        modeSelect.disabled =
+            finished;
+
+
+        /**
+         * One-move button only works when the
+         * controller allows a manual AI step.
+         */
+        stepButton.disabled =
+            !controller.canStep;
+
+
+        /**
+         * Start AI only works:
+         *
+         * - While game is active
+         * - In automatic mode
+         * - When AI is not already running
+         */
+        startAutoButton.disabled =
+            finished ||
+            controller.mode !==
+                'automatic' ||
+            controller.isAutoRunning;
+
+
+        /**
+         * Pause button only works while
+         * automatic AI is currently running.
+         */
+        pauseButton.disabled =
+            !controller.isAutoRunning;
+
+
+        /* ----------------------------------------------------
+           AI STATUS MESSAGE
+           ---------------------------------------------------- */
+
+        aiStatus.textContent =
+            controller.statusText;
+
+
+        /* ----------------------------------------------------
+           WIN CELEBRATION
+           ---------------------------------------------------- */
+
+        if (
+            gameBoard.gameStatus ===
+                'won' &&
+            !celebrationShown
+        ) {
+
+            celebrationShown =
+                true;
+
+
+            cleanupCelebration =
+                showWinCelebration(
+                    app
+                );
+        }
+
+
+        /* ----------------------------------------------------
+           REDRAW BOARD
+           ---------------------------------------------------- */
+
+        boardHost.replaceChildren(
+            renderBoard(
+                gameBoard,
+                controller
+            )
+        );
+    }
+
+
+    /* ========================================================
+       ADD EVERYTHING TO SCREEN
+       ======================================================== */
+
+    boardFrame.append(
+        stats,
+        gameMessage,
+        boardHost
+    );
+
+
+    gameShell.append(
+        gameHeading,
+        controls,
+        boardFrame
+    );
+
+
+    app.append(
+        gameShell
+    );
+
+
+    /* ========================================================
+       INITIAL DRAW
+       ======================================================== */
+
+    updateGameView();
+}

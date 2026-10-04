@@ -1,0 +1,180 @@
+<!--
+ * Module Name: index.html
+ * Description: Top-level HTML shell for the browser-based Minesweeper game.
+ * Inputs: Browser page load and runtime DOM injection from the compiled app entry point.
+ * Outputs: Adds the application root element and loads the bundled JavaScript file.
+ * Author: Audrey Facer, Aayush Gajakas, and team contributors
+ * Creation Date: September 14, 2026
+ * External Sources / Attribution: Original project markup; Google Fonts is used for the arcade-style typeface and is separately attributed to Google.
+ * Code Origin: Original HTML structure combined with project-specific UI setup.
+ *
+ * Project 2 Addition:
+ * Loads ai-controls.css for the Easy AI controls.
+ * Jake Crawford + John
+ -->
+
+<!DOCTYPE html>
+
+<html>
+    <head>
+        <meta charset="utf-8">
+
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1"
+        >
+
+        <title>
+            Minesweeper - EECS 581
+        </title>
+
+        <!-- Google Fonts connection -->
+        <link
+            rel="preconnect"
+            href="https://fonts.googleapis.com"
+        >
+
+        <link
+            rel="preconnect"
+            href="https://fonts.gstatic.com"
+            crossorigin
+        >
+
+        <!-- Arcade-style font used by the original project -->
+        <link
+            href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap"
+            rel="stylesheet"
+        >
+
+        <!-- Original Minesweeper styling -->
+        <link
+            rel="stylesheet"
+            href="style.css"
+        >
+
+        <!--
+            Project 2:
+            Styling for the Easy AI controls.
+        -->
+        <link
+            rel="stylesheet"
+            href="ai-controls.css"
+        >
+    </head>
+
+
+    <body>
+
+        <!-- Decorative elements from the original project -->
+        <div
+            class="side-decorations"
+            aria-hidden="true"
+        >
+
+            <span
+                class="side-box side-box-one"
+            >
+                <span
+                    class="side-bomb"
+                ></span>
+            </span>
+
+
+            <span
+                class="side-box side-box-two"
+            >
+                <span
+                    class="side-flag"
+                ></span>
+            </span>
+
+
+            <span
+                class="side-box side-box-three"
+            >
+                <span
+                    class="side-number"
+                ></span>
+            </span>
+
+
+            <span
+                class="side-box side-box-four"
+            >
+                <span
+                    class="side-flag"
+                ></span>
+            </span>
+
+
+            <span
+                class="side-box side-box-five"
+            >
+                <span
+                    class="side-number"
+                ></span>
+            </span>
+
+
+            <span
+                class="side-box side-box-six"
+            >
+                <span
+                    class="side-bomb"
+                ></span>
+            </span>
+
+
+            <span
+                class="side-box side-box-seven"
+            >
+                <span
+                    class="side-flag"
+                ></span>
+            </span>
+
+
+            <span
+                class="side-box side-box-eight"
+            >
+                <span
+                    class="side-number"
+                ></span>
+            </span>
+
+
+            <span
+                class="side-box side-box-nine"
+            >
+                <span
+                    class="side-bomb"
+                ></span>
+            </span>
+
+
+            <span
+                class="side-box side-box-ten"
+            >
+                <span
+                    class="side-flag"
+                ></span>
+            </span>
+
+        </div>
+
+
+        <!--
+            The Minesweeper UI is dynamically inserted here
+            by the compiled TypeScript code.
+        -->
+        <main id="app"></main>
+
+
+        <!-- Compiled application entry point -->
+        <script
+            type="module"
+            src="dist/main.js"
+        ></script>
+
+    </body>
+</html>

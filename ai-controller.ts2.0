@@ -2,7 +2,7 @@
  * Module: ai-controller.ts
  *
  * Purpose:
- * Controls WHEN the player and Easy AI are allowed to make moves.
+ * Controls when the player and Easy AI are allowed to make moves.
  *
  * The Minesweeper rules themselves stay inside game.ts.
  *
@@ -17,9 +17,6 @@
  *
  * Project 2 Addition
  * Jake Crawford + John
- *
- * This file works with the Easy AI function implemented
- * in game.ts.
  */
 
 import {
@@ -34,149 +31,38 @@ import type {
 } from './types.js';
 
 
-/* ============================================================
-   PLAY MODES
-   ============================================================ */
-
-/**
- * Defines the different ways that the game can be played.
- *
- * manual:
- *     The player controls the board normally.
- *     The player can also request one Easy AI move.
- *
- * alternating:
- *     The player makes one move.
- *     Then the Easy AI makes one move.
- *     Then control returns to the player.
- *
- * automatic:
- *     The Easy AI continuously makes moves by itself
- *     until the game ends or the AI is paused.
- */
 export type PlayMode =
     | 'manual'
     | 'alternating'
     | 'automatic';
 
 
-/* ============================================================
-   MOVE SOLVER TYPE
-   ============================================================ */
-
-/**
- * Defines the format that an AI solver must follow.
- *
- * A solver:
- *
- * 1. Receives the current board.
- * 2. Attempts to make one move.
- * 3. Returns true if it made a move.
- * 4. Returns false if it could not make a move.
- *
- * Easy AI currently uses makeEasyAIMove().
- *
- * Medium AI and Hard AI can eventually follow the same
- * structure without needing to rewrite this controller.
- */
 export type MoveSolver =
     (board: Board) => boolean;
 
 
-/* ============================================================
-   AI CONTROLLER
-   ============================================================ */
-
-/**
- * Controls the interaction between the player and AI.
- *
- * IMPORTANT:
- *
- * This class does NOT contain Minesweeper game rules.
- *
- * Instead it calls:
- *
- * revealCell()
- * toggleFlag()
- * makeEasyAIMove()
- *
- * from game.ts.
- *
- * That keeps the AI/turn-control logic separate from the
- * actual Minesweeper rules.
- */
 export class AIController {
 
-    /**
-     * Current game mode.
-     *
-     * Games begin in manual mode.
-     */
     private currentMode: PlayMode =
         'manual';
 
-
-    /**
-     * True when the player has made a move and
-     * the controller is waiting for the AI's turn.
-     */
     private waitingForAI =
         false;
 
-
-    /**
-     * True while automatic AI play is running.
-     */
     private autoRunning =
         false;
 
-
-    /**
-     * Becomes true when this controller is no
-     * longer being used.
-     *
-     * This prevents an old AI timer from changing
-     * a game after the player starts a new game.
-     */
     private disposed =
         false;
 
-
-    /**
-     * Stores the currently scheduled AI timer.
-     *
-     * Only one AI timer should exist at a time.
-     */
     private timer:
         ReturnType<typeof setTimeout> |
         undefined;
 
-
-    /**
-     * Optional status/error message that can
-     * be displayed by the UI.
-     */
     private notice =
         '';
 
 
-    /**
-     * Creates an AI controller for one Minesweeper board.
-     *
-     * @param board
-     * The existing Minesweeper board.
-     *
-     * @param onUpdate
-     * Function called whenever the UI should redraw.
-     *
-     * @param solver
-     * The AI algorithm that should make one move.
-     * Easy AI is the default.
-     *
-     * @param delayMs
-     * Delay between AI moves.
-     * Default = 500 milliseconds.
-     */
     constructor(
         private readonly board: Board,
         private readonly onUpdate: () => void,
@@ -186,9 +72,6 @@ export class AIController {
             500
     ) {
 
-        /**
-         * Make sure an invalid AI delay was not supplied.
-         */
         if (
             !Number.isFinite(delayMs) ||
             delayMs <= 0
@@ -201,40 +84,21 @@ export class AIController {
     }
 
 
-    /* ========================================================
-       PUBLIC STATE
-       ======================================================== */
-
-    /**
-     * Returns the current play mode.
-     */
     get mode(): PlayMode {
         return this.currentMode;
     }
 
 
-    /**
-     * Returns whether automatic AI mode
-     * is currently running.
-     */
     get isAutoRunning(): boolean {
         return this.autoRunning;
     }
 
 
-    /**
-     * Returns whether the game is currently
-     * waiting for the Easy AI to take its turn.
-     */
     get isWaitingForAI(): boolean {
         return this.waitingForAI;
     }
 
 
-    /**
-     * Returns true while the current game
-     * is still able to accept moves.
-     */
     private get active(): boolean {
 
         return (
@@ -247,10 +111,6 @@ export class AIController {
     }
 
 
-    /**
-     * Determines whether the human player
-     * is currently allowed to interact with the board.
-     */
     get canPlayerAct(): boolean {
 
         return (
@@ -261,13 +121,6 @@ export class AIController {
     }
 
 
-    /**
-     * Determines whether the user can request
-     * one individual Easy AI move.
-     *
-     * Single-step AI moves are only allowed
-     * while in Manual mode.
-     */
     get canStep(): boolean {
 
         return (
@@ -277,56 +130,29 @@ export class AIController {
     }
 
 
-    /* ========================================================
-       STATUS MESSAGE
-       ======================================================== */
-
-    /**
-     * Returns useful information for the UI.
-     *
-     * ui.ts can display this text underneath
-     * the AI controls.
-     */
     get statusText(): string {
 
         if (this.disposed) {
-
             return 'This game has been closed.';
         }
 
 
-        if (
-            this.board.gameStatus === 'won'
-        ) {
-
+        if (this.board.gameStatus === 'won') {
             return 'Game won. AI stopped.';
         }
 
 
-        if (
-            this.board.gameStatus === 'lost'
-        ) {
-
+        if (this.board.gameStatus === 'lost') {
             return 'Game over. AI stopped.';
         }
 
 
-        /**
-         * Show an error or special message
-         * when one exists.
-         */
         if (this.notice) {
-
             return this.notice;
         }
 
 
-        /**
-         * Manual mode status.
-         */
-        if (
-            this.currentMode === 'manual'
-        ) {
+        if (this.currentMode === 'manual') {
 
             return (
                 'Your move. You may also request one Easy AI move.'
@@ -334,66 +160,29 @@ export class AIController {
         }
 
 
-        /**
-         * Alternating player/AI mode status.
-         */
-        if (
-            this.currentMode === 'alternating'
-        ) {
+        if (this.currentMode === 'alternating') {
 
-            if (this.waitingForAI) {
-
-                return 'Easy AI turn...';
-            }
-
-            return (
-                'Your turn: reveal or toggle one flag.'
-            );
+            return this.waitingForAI
+                ? 'Easy AI turn...'
+                : 'Your turn: reveal or toggle one flag.';
         }
 
 
-        /**
-         * Automatic AI mode status.
-         */
         return this.autoRunning
             ? 'Easy AI is playing automatically.'
             : 'Automatic mode paused. Start the AI, or choose Manual to play.';
     }
 
 
-    /* ========================================================
-       MODE SELECTION
-       ======================================================== */
-
-    /**
-     * Changes the current game mode.
-     *
-     * Changing modes:
-     *
-     * - Stops pending AI timers
-     * - Stops automatic AI
-     * - Removes waiting-for-AI state
-     * - Keeps the SAME Minesweeper board
-     *
-     * @param mode
-     * New play mode.
-     */
     setMode(
         mode: PlayMode
     ): void {
 
-        /**
-         * Ignore mode changes if this controller
-         * has already been disposed.
-         */
         if (this.disposed) {
             return;
         }
 
 
-        /**
-         * Protect against an invalid mode being passed.
-         */
         if (
             ![
                 'manual',
@@ -408,16 +197,8 @@ export class AIController {
         }
 
 
-        /**
-         * Stop any AI action that may
-         * already be scheduled.
-         */
         this.cancelTimer();
 
-
-        /**
-         * Reset controller state.
-         */
         this.waitingForAI =
             false;
 
@@ -430,39 +211,15 @@ export class AIController {
         this.currentMode =
             mode;
 
-
-        /**
-         * Tell ui.ts that it should redraw.
-         */
         this.onUpdate();
     }
 
 
-    /* ========================================================
-       CELL VALIDATION
-       ======================================================== */
-
-    /**
-     * Safely retrieves a cell.
-     *
-     * Returns undefined if the coordinates
-     * do not exist on the board.
-     *
-     * @param row
-     * Board row.
-     *
-     * @param col
-     * Board column.
-     */
     private cellAt(
         row: number,
         col: number
     ): Cell | undefined {
 
-        /**
-         * Validate coordinates BEFORE
-         * accessing board.cells.
-         */
         if (
             !Number.isInteger(row) ||
             !Number.isInteger(col) ||
@@ -480,29 +237,11 @@ export class AIController {
     }
 
 
-    /* ========================================================
-       PLAYER REVEAL
-       ======================================================== */
-
-    /**
-     * Handles a player revealing a cell.
-     *
-     * @returns
-     * true if the player made a valid move.
-     * false if the move was rejected.
-     */
     reveal(
         row: number,
         col: number
     ): boolean {
 
-        /**
-         * Reject the move if:
-         *
-         * - Player cannot currently act.
-         * - Coordinates are invalid.
-         * - Cell is not covered.
-         */
         if (
             !this.canPlayerAct ||
             this.cellAt(row, col)?.state !== 'covered'
@@ -512,10 +251,6 @@ export class AIController {
         }
 
 
-        /**
-         * Use the existing Minesweeper logic
-         * from game.ts.
-         */
         revealCell(
             this.board,
             row,
@@ -523,39 +258,17 @@ export class AIController {
         );
 
 
-        /**
-         * Check whether the AI should
-         * respond to the player's move.
-         */
         this.afterPlayerMove();
-
 
         return true;
     }
 
 
-    /* ========================================================
-       PLAYER FLAG
-       ======================================================== */
-
-    /**
-     * Handles flagging or unflagging a cell.
-     *
-     * In alternating mode, a successful flag/unflag
-     * currently counts as the player's turn.
-     *
-     * @returns
-     * true if the flag state changed.
-     * false if the action was rejected.
-     */
     flag(
         row: number,
         col: number
     ): boolean {
 
-        /**
-         * Player must currently be allowed to act.
-         */
         if (!this.canPlayerAct) {
 
             return false;
@@ -566,9 +279,6 @@ export class AIController {
             this.cellAt(row, col);
 
 
-        /**
-         * Reject invalid cells and revealed cells.
-         */
         if (
             !cell ||
             cell.state === 'revealed'
@@ -578,19 +288,10 @@ export class AIController {
         }
 
 
-        /**
-         * Remember the previous state.
-         *
-         * This allows us to detect whether
-         * toggleFlag() actually changed anything.
-         */
         const previousState =
             cell.state;
 
 
-        /**
-         * Use the inherited flag logic.
-         */
         toggleFlag(
             this.board,
             row,
@@ -598,10 +299,6 @@ export class AIController {
         );
 
 
-        /**
-         * If nothing changed, this was not
-         * a successful player action.
-         */
         if (
             cell.state === previousState
         ) {
@@ -610,138 +307,54 @@ export class AIController {
         }
 
 
-        /**
-         * Treat the successful flag/unflag
-         * as a completed player turn.
-         */
         this.afterPlayerMove();
-
 
         return true;
     }
 
 
-    /* ========================================================
-       AFTER PLAYER MOVE
-       ======================================================== */
-
-    /**
-     * Called after a valid human move.
-     *
-     * If the game is in alternating mode,
-     * schedule exactly ONE Easy AI response.
-     */
     private afterPlayerMove(): void {
 
-        /**
-         * Remove an old notice.
-         */
         this.notice =
             '';
 
 
-        /**
-         * Only schedule an AI response
-         * while in alternating mode.
-         */
         if (
             this.currentMode === 'alternating' &&
             this.active
         ) {
 
-            /**
-             * Immediately lock human input.
-             *
-             * This prevents the player from clicking
-             * several cells before the AI gets its turn.
-             */
             this.waitingForAI =
                 true;
 
-
-            /**
-             * Schedule one Easy AI move.
-             */
             this.scheduleMove();
         }
 
 
-        /**
-         * Update the interface.
-         */
         this.onUpdate();
     }
 
 
-    /* ========================================================
-       ONE EASY AI MOVE
-       ======================================================== */
-
-    /**
-     * Performs one Easy AI move immediately.
-     *
-     * This is mainly used by a button such as:
-     *
-     * "One Easy AI Move"
-     *
-     * Manual mode only.
-     *
-     * @returns
-     * true if the AI made a move.
-     * false if it could not.
-     */
     step(): boolean {
 
-        /**
-         * Single-step AI should only
-         * work in manual mode.
-         */
         if (!this.canStep) {
 
             return false;
         }
 
 
-        /**
-         * Ask the AI solver to make one move.
-         */
         const moved =
             this.performAIMove();
 
 
-        /**
-         * Refresh the screen.
-         */
         this.onUpdate();
-
 
         return moved;
     }
 
 
-    /* ========================================================
-       START AUTOMATIC EASY AI
-       ======================================================== */
-
-    /**
-     * Starts automatic AI play.
-     *
-     * The AI repeatedly makes one move,
-     * waits 500 ms, and then makes another.
-     *
-     * @returns
-     * true if automatic AI was started.
-     * false if it could not start.
-     */
     startAuto(): boolean {
 
-        /**
-         * Automatic AI cannot start if:
-         *
-         * - Game is over
-         * - Wrong game mode is selected
-         * - Automatic AI is already running
-         */
         if (
             !this.active ||
             this.currentMode !== 'automatic' ||
@@ -755,37 +368,17 @@ export class AIController {
         this.notice =
             '';
 
-
         this.autoRunning =
             true;
 
-
-        /**
-         * Schedule the first AI move.
-         */
         this.scheduleMove();
 
-
-        /**
-         * Refresh the UI.
-         */
         this.onUpdate();
-
 
         return true;
     }
 
 
-    /* ========================================================
-       PAUSE AUTOMATIC EASY AI
-       ======================================================== */
-
-    /**
-     * Pauses automatic AI play.
-     *
-     * The outstanding timer is cancelled so
-     * another AI move does not occur after Pause.
-     */
     pauseAuto(): void {
 
         if (
@@ -797,40 +390,18 @@ export class AIController {
         }
 
 
-        /**
-         * Stop the pending AI move.
-         */
         this.cancelTimer();
-
 
         this.autoRunning =
             false;
-
 
         this.onUpdate();
     }
 
 
-    /* ========================================================
-       DISPOSE CONTROLLER
-       ======================================================== */
-
-    /**
-     * Permanently shuts down this controller.
-     *
-     * Call this when the player leaves the current
-     * game or starts a new game.
-     *
-     * This prevents an old AI callback from
-     * modifying an abandoned board.
-     */
     dispose(): void {
 
-        /**
-         * Stop any pending AI timer.
-         */
         this.cancelTimer();
-
 
         this.autoRunning =
             false;
@@ -843,16 +414,6 @@ export class AIController {
     }
 
 
-    /* ========================================================
-       CANCEL TIMER
-       ======================================================== */
-
-    /**
-     * Cancels the currently scheduled AI move.
-     *
-     * This guarantees that the controller does not
-     * accidentally create multiple AI loops.
-     */
     private cancelTimer(): void {
 
         if (
@@ -863,52 +424,26 @@ export class AIController {
                 this.timer
             );
 
-
             this.timer =
                 undefined;
         }
     }
 
 
-    /* ========================================================
-       PERFORM AI MOVE
-       ======================================================== */
-
-    /**
-     * Calls the currently selected AI solver.
-     *
-     * Right now the default solver is:
-     *
-     * makeEasyAIMove()
-     *
-     * @returns
-     * true when the AI performed a move.
-     * false if the AI could not perform a move.
-     */
     private performAIMove(): boolean {
 
-        /**
-         * Remove any old AI message.
-         */
         this.notice =
             '';
 
 
         try {
 
-            /**
-             * Ask the Easy AI to make exactly one move.
-             */
             const moved =
                 this.solver(
                     this.board
                 );
 
 
-            /**
-             * If no move could be made,
-             * display an explanation.
-             */
             if (!moved) {
 
                 this.notice =
@@ -922,10 +457,6 @@ export class AIController {
             error: unknown
         ) {
 
-            /**
-             * Stop safely if the AI solver
-             * unexpectedly throws an error.
-             */
             this.notice =
                 `AI stopped: ${
                     error instanceof Error
@@ -939,56 +470,19 @@ export class AIController {
     }
 
 
-    /* ========================================================
-       SCHEDULE AI MOVE
-       ======================================================== */
-
-    /**
-     * Schedules one AI move after delayMs milliseconds.
-     *
-     * IMPORTANT:
-     *
-     * We schedule ONE move at a time instead
-     * of using a blocking while loop.
-     *
-     * That allows the browser to:
-     *
-     * - Redraw the board
-     * - Process clicks
-     * - Process the Pause button
-     * - Process New Game
-     *
-     * between AI moves.
-     */
     private scheduleMove(): void {
 
-        /**
-         * Make sure there is not already
-         * another AI move scheduled.
-         */
         this.cancelTimer();
 
 
-        /**
-         * Schedule the next move.
-         */
         this.timer =
             setTimeout(
                 () => {
 
-                    /**
-                     * The timer has now fired,
-                     * so clear its stored reference.
-                     */
                     this.timer =
                         undefined;
 
 
-                    /**
-                     * If the game has ended or this
-                     * controller was disposed,
-                     * stop AI activity.
-                     */
                     if (!this.active) {
 
                         this.autoRunning =
@@ -1008,28 +502,14 @@ export class AIController {
                     }
 
 
-                    /**
-                     * Make exactly one AI move.
-                     */
                     const moved =
                         this.performAIMove();
 
 
-                    /**
-                     * The AI's alternating turn
-                     * has now completed.
-                     */
                     this.waitingForAI =
                         false;
 
 
-                    /**
-                     * If we are in automatic mode,
-                     * continue only when:
-                     *
-                     * - A move was successfully made
-                     * - The game is still active
-                     */
                     if (
                         this.currentMode === 'automatic'
                     ) {
@@ -1039,9 +519,6 @@ export class AIController {
                             this.active;
 
 
-                        /**
-                         * Schedule the next Easy AI move.
-                         */
                         if (
                             this.autoRunning
                         ) {
@@ -1051,10 +528,6 @@ export class AIController {
                     }
 
 
-                    /**
-                     * Redraw the interface after
-                     * the AI has completed its move.
-                     */
                     this.onUpdate();
 
                 },

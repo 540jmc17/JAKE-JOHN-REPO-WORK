@@ -1,0 +1,624 @@
+/*
+ * Module Name: game.ts
+ * Description: Implements the core Minesweeper game logic for board creation, mine
+ * placement, cell reveal behavior, flag toggling, win detection, loss handling, and a one-move Easy AI solver.
+ *
+ * Inputs: Board state objects, mine counts, row/column coordinates, and game actions
+ * triggered by the UI or automated tests.
+ * Outputs: Mutated Board objects that reflect the game state after each action;
+ * makeEasyAIMove also returns a boolean indicating whether it made a move.
+ *
+ * Original Project 1 Author(s): Heidi Schieber, Lilly Tran, and Aayush Gajakas
+ * Original Creation Date: September 15, 2026
+ * Original Project 1 Sources / Attribution: Original project logic developed for this assignment;
+ * no third-party code was copied. The game behavior follows the standard Minesweeper
+ * rules defined in the project requirements.
+ * Original Code Origin: Original implementation written for Project 1.
+ *
+ * Project 2 Addition: makeEasyAIMove.
+ * Integration/testability update: October 2, 2026 (ChatGPT-generated draft).
+ * Addition Date: October 1, 2026.
+ * Addition Source / Attribution: The Easy AI function and its comments were
+ * generated with ChatGPT using the supplied inherited code and requirements.
+ * Combined Code Origin: Inherited Project 1 logic plus an AI-generated addition.
+ * Record student modifications, review, and testing separately as completed.
+ */
+
+import { createEmptyBoard, type Board } from './types.js';
+
+/**
+ * Checks if a cell falls within a safe area centered at (safeRow, safeCol).
+ *
+ * Utilized when placing mines to ensure the first cell clicked by the player and
+ * its 8 neighboring cells don't contain mines.
+ *
+ * @param row - The target cell's row index.
+ * @param col - The target cell's column index.
+ * @param safeRow - The row index of the player's first click.
+ * @param safeCol - The cell index of the player's first click.
+ * @returns true if the cell is within the safe zone and false otherwise
+ */
+function isSafeCell(
+    row: number,
+    col: number,
+    safeRow: number,
+    safeCol: number
+): boolean {
+    return Math.abs(row - safeRow) <= 1 && Math.abs(col - safeCol) <= 1;
+}
+
+/**
+ * Updates the adjacentMines counter for cells that neighbor a mine.
+ *
+ * @param board - The Minesweeper game board object.
+ * @param row - The row index of the mine.
+ * @param col - The col index of the mine.
+ */
+function updateAdjacentMines(
+    board: Board,
+    row: number,
+    col: number
+): void {
+    for (let rowOffset = -1; rowOffset <= 1; rowOffset++) {
+        for (let colOffset = -1; colOffset <= 1; colOffset++) {
+
+            // Skip the mine cell at (row, col)
+            if (rowOffset === 0 && colOffset === 0) {
+                continue;
+            }
+
+            const neighborRow = row + rowOffset;
+            const neighborCol = col + colOffset;
+
+            // Make sure the neighboring position is inside the board
+            if (
+                neighborRow >= 0 &&
+                neighborRow < board.rows &&
+                neighborCol >= 0 &&
+                neighborCol < board.cols
+            ) {
+                board.cells[neighborRow][neighborCol].adjacentMines += 1;
+            }
+        }
+    }
+}
+
+/**
+ * Randomly places mines across the board.
+ *
+ * @param board - The Minesweeper game board object.
+ * @param safeRow - The row index of the player's first click.
+ * @param safeCol - The cell index of the player's first click.
+ */
+function placeMines(
+    board: Board,
+    safeRow: number,
+    safeCol: number
+): void {
+    let minesPlaced = 0;
+
+    while (minesPlaced < board.mineCount) {
+
+        // Randomly generate the mine's row and column
+        const row = Math.floor(Math.random() * board.rows);
+        const col = Math.floor(Math.random() * board.cols);
+
+        const cell = board.cells[row][col];
+
+        /*
+         * Only place a mine if:
+         * 1. The cell is not already a mine.
+         * 2. The cell is not inside the safe zone around the first click.
+         */
+        if (
+            cell.isMine ||
+            isSafeCell(row, col, safeRow, safeCol)
+        ) {
+            continue;
+        }
+
+        cell.isMine = true;
+        minesPlaced += 1;
+
+        updateAdjacentMines(board, row, col);
+    }
+}
+
+/**
+ * Checks if the game has been won and updates gameStatus if necessary.
+ *
+ * To win, all non-mine cells must be revealed.
+ *
+ * @param board - The Minesweeper game board object.
+ */
+function updateWinStatus(board: Board): void {
+
+    // The game can only be won while actively playing
+    if (board.gameStatus !== 'playing') {
+        return;
+    }
+
+    // Check if every non-mine cell has been revealed
+    const allSafeCellsRevealed = board.cells.every((row) =>
+        row.every(
+            (cell) =>
+                cell.isMine ||
+                cell.state === 'revealed'
+        )
+    );
+
+    // Stop if safe cells still remain covered
+    if (!allSafeCellsRevealed) {
+        return;
+    }
+
+    // Update the game state
+    board.gameStatus = 'won';
+
+    /*
+     * Automatically flag any remaining mines after the game
+     * has been successfully completed.
+     */
+    for (const row of board.cells) {
+        for (const cell of row) {
+
+            if (
+                cell.isMine &&
+                cell.state === 'covered'
+            ) {
+                cell.state = 'flagged';
+            }
+        }
+    }
+}
+
+/**
+ * Reveals all mines on the board.
+ *
+ * Used when the player or AI selects a mine.
+ *
+ * @param board - The Minesweeper game board object.
+ */
+function revealAllMines(board: Board): void {
+    for (const row of board.cells) {
+        for (const cell of row) {
+
+            if (cell.isMine) {
+                cell.state = 'revealed';
+            }
+        }
+    }
+}
+
+/**
+ * Reveals neighboring empty cells.
+ *
+ * If a revealed cell contains zero neighboring mines,
+ * neighboring cells are automatically revealed as well.
+ *
+ * @param board - The Minesweeper game board object.
+ * @param row - The starting row.
+ * @param col - The starting column.
+ */
+function revealEmptyNeighbors(
+    board: Board,
+    row: number,
+    col: number
+): void {
+
+    /*
+     * This array stores cells that still need to have their
+     * neighbors checked.
+     */
+    const cellsToVisit: Array<[number, number]> = [
+        [row, col]
+    ];
+
+    while (cellsToVisit.length > 0) {
+
+        const [currentRow, currentCol] =
+            cellsToVisit.pop()!;
+
+        for (
+            let rowOffset = -1;
+            rowOffset <= 1;
+            rowOffset++
+        ) {
+            for (
+                let colOffset = -1;
+                colOffset <= 1;
+                colOffset++
+            ) {
+
+                const neighborRow =
+                    currentRow + rowOffset;
+
+                const neighborCol =
+                    currentCol + colOffset;
+
+                // Skip coordinates outside the board
+                if (
+                    neighborRow < 0 ||
+                    neighborRow >= board.rows ||
+                    neighborCol < 0 ||
+                    neighborCol >= board.cols
+                ) {
+                    continue;
+                }
+
+                const neighbor =
+                    board.cells[neighborRow][neighborCol];
+
+                /*
+                 * Ignore cells that are already revealed,
+                 * flagged, or contain mines.
+                 */
+                if (
+                    neighbor.state !== 'covered' ||
+                    neighbor.isMine
+                ) {
+                    continue;
+                }
+
+                neighbor.state = 'revealed';
+
+                /*
+                 * If this neighboring cell also has no
+                 * surrounding mines, check its neighbors too.
+                 */
+                if (neighbor.adjacentMines === 0) {
+                    cellsToVisit.push([
+                        neighborRow,
+                        neighborCol
+                    ]);
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Initializes a 10x10 Minesweeper game board.
+ *
+ * @param mineCount - Number of mines to place on the board.
+ * @returns A new board in the ready state.
+ */
+export function createGame(
+    mineCount: number
+): Board {
+
+    return createEmptyBoard(
+        10,
+        10,
+        mineCount,
+        'ready'
+    );
+}
+
+/**
+ * Handles revealing a cell.
+ *
+ * This function is used by both the human player
+ * and the Easy AI.
+ *
+ * @param board - The Minesweeper game board.
+ * @param row - Row of the selected cell.
+ * @param col - Column of the selected cell.
+ */
+export function revealCell(
+    board: Board,
+    row: number,
+    col: number
+): void {
+
+    /*
+     * Reject invalid coordinates or moves made after
+     * the game has already finished.
+     */
+    if (
+        row < 0 ||
+        row >= board.rows ||
+        col < 0 ||
+        col >= board.cols ||
+        board.gameStatus === 'lost' ||
+        board.gameStatus === 'won'
+    ) {
+        return;
+    }
+
+    const cell = board.cells[row][col];
+
+    /*
+     * Only covered cells may be revealed.
+     *
+     * This prevents already-revealed or flagged cells
+     * from being selected.
+     */
+    if (cell.state !== 'covered') {
+        return;
+    }
+
+    /*
+     * On the first move, the mines are generated.
+     *
+     * The selected cell and its surrounding neighbors
+     * are guaranteed to be safe.
+     */
+    if (board.gameStatus === 'ready') {
+
+        placeMines(
+            board,
+            row,
+            col
+        );
+
+        board.gameStatus = 'playing';
+    }
+
+    /*
+     * If the selected cell contains a mine,
+     * reveal all mines and end the game.
+     */
+    if (cell.isMine) {
+
+        revealAllMines(board);
+
+        board.gameStatus = 'lost';
+
+        return;
+    }
+
+    // Reveal the selected safe cell
+    cell.state = 'revealed';
+
+    /*
+     * Automatically reveal surrounding empty cells
+     * when the selected cell contains zero neighboring mines.
+     */
+    if (cell.adjacentMines === 0) {
+
+        revealEmptyNeighbors(
+            board,
+            row,
+            col
+        );
+    }
+
+    // Check whether this move completed the board
+    updateWinStatus(board);
+}
+
+/**
+ * Toggles a cell between covered and flagged.
+ *
+ * @param board - The Minesweeper game board.
+ * @param row - Row of the selected cell.
+ * @param col - Column of the selected cell.
+ */
+export function toggleFlag(
+    board: Board,
+    row: number,
+    col: number
+): void {
+
+    // Prevent invalid moves
+    if (
+        row < 0 ||
+        row >= board.rows ||
+        col < 0 ||
+        col >= board.cols ||
+        board.gameStatus === 'lost' ||
+        board.gameStatus === 'won'
+    ) {
+        return;
+    }
+
+    const cell =
+        board.cells[row][col];
+
+    // Revealed cells cannot be flagged
+    if (cell.state === 'revealed') {
+        return;
+    }
+
+    /*
+     * Remove a flag if the cell is already flagged.
+     */
+    if (cell.state === 'flagged') {
+
+        cell.state = 'covered';
+
+    /*
+     * Otherwise add a flag, as long as the player
+     * has not already used all available flags.
+     */
+    } else if (
+        board.cells
+            .flat()
+            .filter(
+                (candidate) =>
+                    candidate.state === 'flagged'
+            ).length < board.mineCount
+    ) {
+
+        cell.state = 'flagged';
+    }
+
+    /*
+     * Recheck win conditions after flag changes
+     * while the game is being played.
+     */
+    if (board.gameStatus === 'playing') {
+        updateWinStatus(board);
+    }
+}
+
+
+/* ============================================================
+   EASY AI IMPLEMENTATION
+   Jake + John - Project 2
+   ============================================================ */
+
+/**
+ * Makes one Easy AI move.
+ *
+ * Easy AI behavior:
+ *
+ * 1. Find every cell that is still covered.
+ * 2. Ignore revealed cells.
+ * 3. Ignore flagged cells.
+ * 4. Randomly select one valid covered cell.
+ * 5. Reveal that cell using the existing revealCell()
+ *    function.
+ *
+ * The Easy AI does NOT:
+ *
+ * - Look at hidden mine locations.
+ * - Analyze numbered cells.
+ * - Try to determine whether a cell is safe.
+ *
+ * Because of this, the Easy AI can randomly select
+ * a mine and lose the game.
+ *
+ * @param board - The current Minesweeper board.
+ * @param random - Optional random-number generator used for testing.
+ *
+ * @returns true when the AI successfully makes a move.
+ *          false when no move can be made.
+ */
+export function makeEasyAIMove(
+    board: Board,
+    random: () => number = Math.random
+): boolean {
+
+    /*
+     * Do not allow the AI to make another move
+     * after the game has already ended.
+     */
+    if (
+        board.gameStatus === 'won' ||
+        board.gameStatus === 'lost'
+    ) {
+        return false;
+    }
+
+    /*
+     * Store the coordinates of every cell that
+     * the Easy AI is allowed to select.
+     */
+    const validCells:
+        Array<[number, number]> = [];
+
+    /*
+     * Scan the entire board.
+     */
+    for (
+        let row = 0;
+        row < board.rows;
+        row++
+    ) {
+
+        for (
+            let col = 0;
+            col < board.cols;
+            col++
+        ) {
+
+            const cell =
+                board.cells[row][col];
+
+            /*
+             * The AI may only select covered cells.
+             *
+             * Flagged cells and revealed cells
+             * are automatically excluded.
+             */
+            if (cell.state === 'covered') {
+
+                validCells.push([
+                    row,
+                    col
+                ]);
+            }
+        }
+    }
+
+    /*
+     * If there are no legal cells left,
+     * the AI cannot make a move.
+     */
+    if (validCells.length === 0) {
+        return false;
+    }
+
+    /*
+     * Generate a random number.
+     *
+     * During normal gameplay this uses Math.random().
+     * Tests can provide their own random-number function
+     * so the AI's move can be predictable.
+     */
+    const sample = random();
+
+    /*
+     * Make sure the supplied random function behaves
+     * like Math.random() and returns a number from
+     * 0 inclusive to 1 exclusive.
+     */
+    if (
+        !Number.isFinite(sample) ||
+        sample < 0 ||
+        sample >= 1
+    ) {
+
+        throw new RangeError(
+            'The Easy AI random source must return a number in [0, 1).'
+        );
+    }
+
+    /*
+     * Convert the random number into an index
+     * inside the validCells array.
+     */
+    const randomIndex =
+        Math.floor(
+            sample * validCells.length
+        );
+
+    /*
+     * Get the row and column of the randomly
+     * selected cell.
+     */
+    const [row, col] =
+        validCells[randomIndex]!;
+
+    /*
+     * IMPORTANT:
+     *
+     * Instead of rewriting Minesweeper logic here,
+     * call the existing revealCell() function.
+     *
+     * This means the AI automatically uses the game's
+     * existing logic for:
+     *
+     * - First-click mine placement
+     * - Revealing cells
+     * - Empty-cell expansion
+     * - Hitting a mine
+     * - Losing
+     * - Winning
+     */
+    revealCell(
+        board,
+        row,
+        col
+    );
+
+    /*
+     * A move was successfully attempted.
+     *
+     * This still returns true if the selected cell
+     * happened to be a mine and caused the game to end.
+     */
+    return true;
+}

@@ -1,0 +1,3 @@
+npm.cmd run build
+
+ npm.cmd run start

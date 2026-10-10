@@ -330,7 +330,7 @@ test('Easy AI uses Math.random by default', (context) => {
 
     // Project 2: Skip first-click mine generation
     // so the mock only tests Easy AI random Selection.
-    board.gaemStatus = 'playing';
+    board.gameStatus = 'playing';
 
     // Project 2: Replace Math.random with a predictable value for this specific test.
     const random = context.mock.method(

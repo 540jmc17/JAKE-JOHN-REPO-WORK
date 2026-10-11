@@ -6,6 +6,46 @@ This project is a browser-based Minesweeper game implemented in TypeScript. The 
 
 The new enhanced system supports Normal mode with a timer, Easy AI, Medium AI, Hard AI, Basic Self-Solving mode, and Advanced Self-Solving mode. Project 2 extends the original system with multiple new AI features and a high-score tracking timer for Normal mode. 
 
+## Architecture
+
+```mermaid
+flowchart TD
+    HTML[index.html] --> Main[src/main.ts]
+    Main --> UI[src/ui.ts]
+
+    UI --> DOM[Browser DOM]
+    UI --> Canvas[Canvas 2D win animation]
+    UI -->|reveal / flag| Game[src/game.ts<br/>game engine]
+    UI -->|Easy, Medium, or Hard mode| Turn[Turn controller in ui.ts<br/>AI_MOVES table + 1s delay]
+    UI -->|Self-solving mode| Solver[Self-solver loop in ui.ts<br/>one move every 0.5s]
+    UI -->|start / finish| Timer[src/new_suggestion/<br/>timerHighScore.ts]
+
+    Turn -->|one move per turn| AI[AI solver in src/game.ts<br/>Easy + Medium + Hard]
+    Solver -->|makeBasicSelfSolvingMove/makeAdvancedSelfSolvingMove| AI
+    AI -->|revealCell / toggleFlag| Game
+    Timer -->|best time per mine count| Storage[(Browser localStorage)]
+
+    Game --> Types[src/types.ts]
+    UI --> Types
+
+    classDef added fill:#fff4e5,stroke:#f59e0b,color:#111;
+    class Turn,Solver,AI,Timer,Storage added;
+```
+
+Orange boxes were added in Project 2.
+
+- `index.html` provides the application root and loads the compiled entry point.
+- `src/main.ts` starts the application by rendering the start screen, then passes the chosen mine count and game mode to the game screen.
+- `src/ui.ts` owns screen rendering, browser events, board-cell interaction, HUD updates, and the win animation. The start screen has a game mode dropdown (Normal, Easy AI, Medium AI, Hard AI, Basic Self-Solving).
+- **Turn controller** (inside `src/ui.ts`): in an AI mode, it waits one second after each player move, then calls the AI move function for the selected mode from the `AI_MOVES` table. The board is locked while the AI move is pending, and starting a new game cancels it. Adding a new difficulty only needs one new entry in `AI_MOVES` and one dropdown option.
+- **Self-solver loop** (inside `src/ui.ts`): in Basic Self-Solving mode, the computer plays the whole game alone. It calls `makeBasicSelfSolvingMove` every half second until the game is won or lost, and player clicks are ignored.  In Advanced Self-Solving mode, it calls `makeAdvancedSelfSolvingMove`, which reuses the Hard AI's deduction logic and ingnores player clicks. Both modes continue automatically until the game is won or lost. A pending move is cancelled when a new game starts.
+- **AI solver** (inside `src/game.ts`): `makeEasyAIMove`, `makeMediumAIMove`, and `makeHardAIMove` each make exactly one move per call. Easy reveals a random covered cell, never picking a flagged or already revealed one. Medium applies the two basic rules (flag all hidden neighbors when they must all be mines, open the rest when a number's flags are satisfied) and otherwise clicks a random covered cell. Hard adds the 1-2-1 pattern rule before falling back to a random click. `makeBasicSelfSolvingMove` reuses the Easy logic and `makeAdvancedSelfSolvingMove` reuses the Hard AI logic. The AI only reads what a player can see (cell state and numbers), never `isMine`, and acts through the same `revealCell` and `toggleFlag` functions the player uses.
+- `src/game.ts` owns board creation, mine placement, adjacent-mine counts, revealing, flagging, win detection, and loss handling.
+- `src/new_suggestion/timerHighScore.ts` is the custom addition. It starts the clock on the first reveal, freezes it on a win or loss, and saves the fastest winning time for each mine count in the browser's `localStorage`. The HUD shows the current time and the best time. Its UML diagram is in `src/new_suggestion/documents_uml/minesweeper_addition_uml.pdf`.
+- `src/types.ts` defines shared constants, data structures, coordinate helpers, and bounds checking.
+- `style.css` supplies the visual design and responsive board layout.
+- Tests: `src/game.test.ts` covers the game rules and the AI levels, and `src/new_suggestion/timerHighScore.test.ts` covers the timer and high scores.
+
 ## System Architecture Overview
 The Minesweeper project uses a modular design where different files work together to run the game. Each file has its own responsibility, making the program easier to understand, maintain, and update. 
 
@@ -58,46 +98,6 @@ In Project 2, additional tests check AI behavior, such as ensuring Easy AI does 
 ### Supporting Files
 - `index.html`: Provides the main HTML structure and loads the game into the browser.   
 - `style.css`: Controls the appearance of the game, including colors, buttons, board layout, and visual effects. 
-
-## Architecture
-
-```mermaid
-flowchart TD
-    HTML[index.html] --> Main[src/main.ts]
-    Main --> UI[src/ui.ts]
-
-    UI --> DOM[Browser DOM]
-    UI --> Canvas[Canvas 2D win animation]
-    UI -->|reveal / flag| Game[src/game.ts<br/>game engine]
-    UI -->|Easy, Medium, or Hard mode| Turn[Turn controller in ui.ts<br/>AI_MOVES table + 1s delay]
-    UI -->|Self-solving mode| Solver[Self-solver loop in ui.ts<br/>one move every 0.5s]
-    UI -->|start / finish| Timer[src/new_suggestion/<br/>timerHighScore.ts]
-
-    Turn -->|one move per turn| AI[AI solver in src/game.ts<br/>Easy + Medium + Hard]
-    Solver -->|makeBasicSelfSolvingMove| AI
-    AI -->|revealCell / toggleFlag| Game
-    Timer -->|best time per mine count| Storage[(Browser localStorage)]
-
-    Game --> Types[src/types.ts]
-    UI --> Types
-
-    classDef added fill:#fff4e5,stroke:#f59e0b,color:#111;
-    class Turn,Solver,AI,Timer,Storage added;
-```
-
-Orange boxes were added in Project 2.
-
-- `index.html` provides the application root and loads the compiled entry point.
-- `src/main.ts` starts the application by rendering the start screen, then passes the chosen mine count and game mode to the game screen.
-- `src/ui.ts` owns screen rendering, browser events, board-cell interaction, HUD updates, and the win animation. The start screen has a game mode dropdown (Normal, Easy AI, Medium AI, Hard AI, Basic Self-Solving).
-- **Turn controller** (inside `src/ui.ts`): in an AI mode, it waits one second after each player move, then calls the AI move function for the selected mode from the `AI_MOVES` table. The board is locked while the AI move is pending, and starting a new game cancels it. Adding a new difficulty only needs one new entry in `AI_MOVES` and one dropdown option.
-- **Self-solver loop** (inside `src/ui.ts`): in Basic Self-Solving mode, the computer plays the whole game alone. It calls `makeBasicSelfSolvingMove` every half second until the game is won or lost, and player clicks are ignored. A pending move is cancelled when a new game starts.
-- **AI solver** (inside `src/game.ts`): `makeEasyAIMove`, `makeMediumAIMove`, and `makeHardAIMove` each make exactly one move per call. Easy reveals a random covered cell, never picking a flagged or already revealed one. Medium applies the two basic rules (flag all hidden neighbors when they must all be mines, open the rest when a number's flags are satisfied) and otherwise clicks a random covered cell. Hard adds the 1-2-1 pattern rule before falling back to a random click. `makeBasicSelfSolvingMove` reuses the Easy logic. The AI only reads what a player can see (cell state and numbers), never `isMine`, and acts through the same `revealCell` and `toggleFlag` functions the player uses.
-- `src/game.ts` owns board creation, mine placement, adjacent-mine counts, revealing, flagging, win detection, and loss handling.
-- `src/new_suggestion/timerHighScore.ts` is the custom addition. It starts the clock on the first reveal, freezes it on a win or loss, and saves the fastest winning time for each mine count in the browser's `localStorage`. The HUD shows the current time and the best time. Its UML diagram is in `src/new_suggestion/documents_uml/minesweeper_addition_uml.pdf`.
-- `src/types.ts` defines shared constants, data structures, coordinate helpers, and bounds checking.
-- `style.css` supplies the visual design and responsive board layout.
-- Tests: `src/game.test.ts` covers the game rules and the AI levels, and `src/new_suggestion/timerHighScore.test.ts` covers the timer and high scores.
 
 ## Data Model
 

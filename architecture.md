@@ -84,7 +84,7 @@ The AI logic in `src/game.ts` uses two sets of strings to track cells for medium
 - **Safe-cell set (`Set<string>`):** Stores the coordinates of cells that AI determined are safe.
 
 **3. Candidate Cell Lists**     
-The AI uses arrays of row-and-column coordinate pairs (`Array<[number, number]>`), to store covered cells. This allows modes, such as Easy-AI, to keep track of which cells may be selected.
+The AI uses arrays of row-and-column coordinate pairs (`Array<[number, number]>`) to store covered cells. This allows modes, such as Easy-AI, to keep track of which cells may be selected.
 
 **4. AI Turn and Self-Solver Control**    
 The UI uses the `aiControl` object with a pending timer and a Boolean to show whether an AI move is waiting to execute. This disallows a player to move while an interactive AI turn is pending. 
@@ -111,38 +111,46 @@ These additions extend the original interface while allowing the original contro
 
 ### Component Interfaces
 The system components communicate through imported functions and shared callbacks.
-- `main.ts` and `ui.ts`: `main.ts` calls `renderStartScreen()` to display the initial screen. The callback passes the selected mine count and game mode to `renderGameScreen()` to initialize the appropriate mode.
-- 
+- **Game Mode Selection** (`main.ts` and `ui.ts`): `main.ts` calls `renderStartScreen()` to display the initial screen. The callback passes the selected mine count and game mode to `renderGameScreen()` to initialize the appropriate mode.
+- **Interactive AI Interface** (`ui.ts` and `game.ts`): The `AI_MOVES` record maps Easy, Medium, and Hard AI modes to `makeEasyAIMove()`, `makeMediumAIMove`, and `makeHardAIMove`. Each function will also receive the current `Board` and return a Boolean to show if a move was made. The UI schedules the AI to have an uninterrupted turn and refresh the board after an action from AI.
+- **Self-Solving Interface** (`ui.ts` and `game.ts`): Basic Self-Solving calls `makeBasicSelfSolvingMove()` which will reuse the easy AI logic to operate. Advanced Self-Solving calls `makeAdvancedSelfSolvingMove()` which also will reuse Hard AI logic. The UI will schedule the moves to continue to occur until the game ends.
+- **Timer and High-Score Interface** (`ui.ts` and `timerHighScore.ts`): For normal mode the UI will create `TimerHighScoreController` and uses its corresponding methods to handle the timing and its information. The `TimerSnapshot` will show the elapsed time, the best time, and an answer to if the new best time was earned.
 
-## Game Flow
+## Game Flow - with additions
 
-1. `renderStartScreen` displays the mine-count slider from 10 through 20.
+1. `renderStartScreen` displays the mine-count slider from 10 through 20. Also a game-mode dropdown with Normal, Easy AI, Medium AI, Hard AI, Basic Self-Solving, and Advanced Self-Solving options.
 2. Starting a game calls `createGame`, which creates an empty 10-by-10 board in `ready` status.
 3. The first `revealCell` call places mines randomly while excluding the clicked cell and its surrounding eight-cell safe area.
 4. Mine placement increments `adjacentMines` on neighboring cells and changes the board to `playing`.
 5. Revealing a safe zero-count cell performs an iterative flood reveal of neighboring safe cells.
 6. Revealing a mine reveals every mine and changes the board to `lost`.
 7. Revealing every non-mine cell changes the board to `won` and flags remaining mines.
-8. Right-clicking a covered cell toggles its flag. The number of flags cannot exceed `mineCount`.
+8. In Normal mode, right-clicking a covered cell toggles its flag. The number of flags cannot exceed `mineCount`. Flagging is disabled in AI and self-solving modes.   
 9. After every action, the UI rerenders the board and displays `mineCount - flaggedCount` as the remaining-mine counter.
-10. The New Game button returns the player to the configuration screen.
+10. The New Game button returns the player to the configuration screen. It will cancel pending AI or self-solving moves and remove the timer when applicable.
+11. In interactive modes, the UI schedules one AI move one second after a valid player move. Player input is disabled while the AI move is pending.
+12. The `AI_MOVES` record selects the function for the chosen AI difficulty. Easy AI randomly reveals a covered cell. Medium AI applies two basic deduction rules before falling back to a random choice. Hard AI adds the 1-2-1 pattern rule. The AI uses the existing game logic to reveal its selected cell.
+13. In Basic Self-Solving mode, the UI automatically makes a move every 0.5 seconds using `makeBasicSelfSolvingMove`. User cell clicks are ignored.
+14. In Advanced Self-Solving mode, the UI automatically makes a move every 0.5 seconds using `makeAdvancedSelfSolvingMove`. The solver continues until the game ends. User cell clicks are ignored.
+15. In Normal mode, the timer starts when the first reveal changes the game status from `ready` to `playing`. It stops when the game is won or lost. Only winning games will update the best time for the selected mine count, with records saved in browser `localStorage`.
+16. When an interactive AI game or a self-solving game ends, the UI displays the appropriate result message and stops further game moves. In Normal mode, the timer and high-score display show the final timing result.
 
 ## State Rules
 
 - `ready`: mines have not been generated; the first reveal initializes the board.
-- `playing`: the player can reveal and flag cells.
+- `playing`: player can reveal and flag cells, an AI opponent can make moves, or the self-solver can play automatically.
 - `won`: all safe cells are revealed; further actions are ignored.
 - `lost`: a mine was revealed; further actions are ignored.
 - A revealed cell cannot be flagged.
 - A flagged cell cannot be revealed.
-- Flagging is capped at the selected mine count, but flags may always be removed.
+- Flagging is capped at the selected mine count, but flags may always be removed. Flagging is disabled in AI and self-solving modes.
 
 ## Extension Points
 
 - Board dimensions and mine limits are centralized in `src/types.ts`.
 - Game rules are isolated from the DOM in `src/game.ts`, allowing unit tests or another UI to reuse them.
 - Rendering is isolated in `src/ui.ts`, allowing future keyboard controls, touch controls, or alternate layouts.
-- The current `Board` model can be extended with timers, player metadata, difficulty names, or persisted game state without changing the cell interaction API.
+- The current `Board` model can be extended with more gameplay statistics, player metadata, difficulty names, or persisted game state without changing the cell interaction API.
 - `src/game.test.ts` provides a starting point for expanding automated rule coverage.
 
 ## Verification

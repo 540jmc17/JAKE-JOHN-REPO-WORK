@@ -6,6 +6,59 @@ This project is a browser-based Minesweeper game implemented in TypeScript. The 
 
 The new enhanced system supports Normal mode with a timer, Easy AI, Medium AI, Hard AI, Basic Self-Solving mode, and Advanced Self-Solving mode. Project 2 extends the original system with multiple new AI features and a high-score tracking timer for Normal mode. 
 
+## System Architecture Overview
+The Minesweeper project uses a modular design where different files work together to run the game. Each file has its own responsibility, making the program easier to understand, maintain, and update. 
+
+The first application starts with `main.ts`, which initializes the game and connects the start screen to the user interface. The `ui.ts` file handles everything the player sees and interacts with, including the game board, buttons, and the messages.
+
+The player will then select a square where the `ui.ts` communicates with `game.ts`, which handles the actual game rules. These include placing mines, revealing squares, flagging mines, and determining whether the game has been won or lost.
+
+In Project 2, the game is expanding with Easy, Medium, and Hard AI features, along with Basic and Advanced Self-Solving modes. The AI uses the same board game logic as the player, allowing the computer to make moves without changing how the original game works. The project also includes a custom timer and high-score feature for Normal mode. The `timerHighScore.ts` module manages elapsed time and saved winning records, using browser `localStorage` to keep high scores.
+
+The `types.ts` file defines the shared data structures used throughout the system, while `style.css` controls the appearance of the game.
+
+This design keeps the game organized by separating the user interface, gameplay logic, and shared data. 
+
+## Architectural Components
+### Application Startup - `main.ts`
+The main.ts file is responsible for starting the Minesweeper application.
+
+It displays the starting screen and connects the player’s game settings to the user interface. When the player starts a new game, it passes the selected settings to `ui.ts`.
+This file keeps the startup process separate from the actual game logic.
+
+### User Interface - `ui.ts`
+The `ui.ts` file manages everything the player sees and interacts with during the game. It displays the Minesweeper board, handles mouse clicks, updates the mine counter, and shows messages when the game is won or lost. 
+
+In Project 2, this file also helps control the different AI modes. It determines when the AI should make a move and updates the screen afterward.
+This allows the interface to handle player interactions while `game.ts` manages the rules. 
+
+### Game Logic - `game.ts`
+The `game.ts` file contains the main rules and functions that control how Minesweeper works. Its responsibilities include creating the board, placing mines, revealing squares, flagging cells, and checking whether the player has won or lost.
+
+In Project 2, additional functions are being implemented for the AI difficulties. 
+- **Easy AI**: Randomly selects a covered square while avoiding revealed cells.
+- **Medium AI**: Uses basic Minesweeper rules to identify safe squares and possible mines.
+- **Hard AI**: Uses more advanced logic, including the 1-2-1 pattern, to make decisions.
+- **Basic Self-Solving:** Reuses the Easy AI's random-move logic.
+- **Advanced Self-Solving:** Reuses the Hard AI's deduction logic.
+
+These AI features reuse the original game functions, allowing the computer and player to follow the same game rules. 
+
+### Data Structures - `types.ts` 
+The types.ts file defines the important data structures used throughout the game. These include the board size, number of mines, cell information, coordinates, and game status. For example, each cell stores whether it contains a mine, how many mines are nearby, and whether it is covered, revealed, or flagged. By keeping this information in one file, the other modules can use the same data structures consistently. 
+
+### Timer and High Scores - `timerHighScore.ts`
+The `timerHighScore.ts` file is part of the custom feature added in Project 2. It tracks how much time the player spends completing a game and saves the fastest winning time. This feature communicates with `ui.ts` to display the timer and high scores. The best times are saved using the browser’s local storage. Keeping this functionality separate makes it easier to update without changing the original game rules. 
+
+### Testing - `game.test.ts` 
+The `game.test.ts` file contains automated tests used to verify that the game works correctly. The original tests check features such as mine placement, flagging, revealing squares, and winning or losing.
+
+In Project 2, additional tests check AI behavior, such as ensuring Easy AI does not select already revealed cells. These tests help identify problems and make sure that new features do not break existing functionality.
+
+### Supporting Files
+- `index.html`: Provides the main HTML structure and loads the game into the browser.   
+- `style.css`: Controls the appearance of the game, including colors, buttons, board layout, and visual effects. 
+
 ## Architecture
 
 ```mermaid
@@ -152,6 +205,8 @@ The system components communicate through imported functions and shared callback
 - Rendering is isolated in `src/ui.ts`, allowing future keyboard controls, touch controls, or alternate layouts.
 - The current `Board` model can be extended with more gameplay statistics, player metadata, difficulty names, or persisted game state without changing the cell interaction API.
 - `src/game.test.ts` provides a starting point for expanding automated rule coverage.
+
+The modular structure allows future teams to improve Minesweeper without having to rebuild the entire project. For example, the next developers can add new AI difficulties, improve the user interface, or create additional game features while continuing to use the existing game logic. Keeping everything organized and clean for future developers to read and not to make further mistakes can help as well. Overall, this architecture makes Minesweeper easier to maintain, test, and expand in the future. 
 
 ## Verification
 

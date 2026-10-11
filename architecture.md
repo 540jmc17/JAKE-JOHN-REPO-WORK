@@ -76,12 +76,43 @@ Coordinates are zero-indexed internally. The UI renders a 10-by-10 board, with c
 
 **1. Game Modes and AI Move Mapping**   
 The `GameMode` type in `src/ui.ts` identifies the selected game mode: Normal, Easy AI, Medium AI, Hard AI, Basic Self-Solving, or Advanced Self-Solving.
-The `AI_Moves` record maps each interactive AI mode to the correct move function. This allows the UI to use the right AI strategy and promotes reusability by preventing a seperate turn control for each type.
+The `AI_MOVES` record maps each interactive AI mode to the correct move function. This allows the UI to use the right AI strategy and promotes reusability by preventing a separate turn control for each type.
 
-**2. AI Deduction Sets**   
+**2. AI Medium and Hard Sets**   
+The AI logic in `src/game.ts` uses two sets of strings to track cells for medium and hard AI interactive modes:
+- **Mine set (`Set<string>`):** Stores coordinates of cells the AI has determined are mines.
+- **Safe-cell set (`Set<string>`):** Stores the coordinates of cells that AI determined are safe.
 
+**3. Candidate Cell Lists**     
+The AI uses arrays of row-and-column coordinate pairs (`Array<[number, number]>`), to store covered cells. This allows modes, such as Easy-AI, to keep track of which cells may be selected.
 
+**4. AI Turn and Self-Solver Control**    
+The UI uses the `aiControl` object with a pending timer and a Boolean to show whether an AI move is waiting to execute. This disallows a player to move while an interactive AI turn is pending. 
 
+**5. Timer and High-Score Data**    
+The custom timer feature is managed by `TimerHighScoreController` in `src/new_suggestion/timerHighScore.ts`. The UI uses a `TimerSnapshot` that uses the elapsed time, the best recorded time (or `null` if no record exists), and a Boolean to show whether the current result is a new best score. This feature operates in Normal mode and stores the winning time in `localStorage` to allow records to remain in the browser for each mine count.
+
+## Interface Description - with additions
+### User Input   
+The user interacts through the browser-based interface, which is implemented in `src/ui.ts`.
+- Game Setup: The player will select a mine count from 10 to 20 using the slider and then choose one of the six available game modes using the dropdown selector.
+- Cell Revealing: In Normal mode, the player can left-click to reveal a covered cell. In the interactive AI modes, the player and AI alternate turns. This means when it is the AI's turn, the user may not reveal a cell. Also, in the self-solving modes, the user cannot change or click the board.
+- Flagging: In Normal mode, the player may right-click to flag a covered cell or remove a flag. Flagging is disabled in the other modes.
+- Self-Solving Modes: In Basic and Advanced Self-Solving modes, the computer performs moves automatically.
+- New Game: The New Game button cancels pending AI or self-solver moves, disposes of the timer in Normal mode, and returns the player to the start screen.
+### User Interface
+The user interface displays the board state and provides feedback to the user. The following is related to the new modes developed:
+- **Game Mode Selector:** Adds a dropdown to the start screen with six options.
+- **Interactive AI Modes:** Displays the selected AI difficulty and allows alternating player and AI turns.
+- **Timer and High Scores:** In Normal mode, shows the elapsed game time and the best recorded winning time for the selected mine count.
+- **AI Result Messages:** Displays the winner or loss message when an interactive AI game ends or a self-solving attempt fails.
+
+These additions extend the original interface while allowing the original controls and game board to stay.
+
+### Component Interfaces
+The system components communicate through imported functions and shared callbacks.
+- `main.ts` and `ui.ts`: `main.ts` calls `renderStartScreen()` to display the initial screen. The callback passes the selected mine count and game mode to `renderGameScreen()` to initialize the appropriate mode.
+- 
 
 ## Game Flow
 

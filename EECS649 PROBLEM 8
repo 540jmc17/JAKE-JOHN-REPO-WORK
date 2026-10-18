@@ -1,42 +1,60 @@
-"""EECS 649, Assignment 3, Problem 8 — 3D Squares puzzle solver.
-
-Adapted from the optional instructor scaffold `assignment3_problem8 (1).py`.
-Two independent search methods: uninformed DFS and informed Greedy Best-First.
-
-IMPORTANT ABOUT DATA:
-  PIECES is a proposed transcription of the photographed 3x3 puzzle, derived
-  from the supplied original/goal pictures. The moon A/B distinction is hard
-  to read in the photos. Treat this as a candidate encoding and visually
-  verify the individual half-images against the physical puzzle if possible.
-  The program checks that the photographed reference goal is compatible with
-  the proposed encoding, but this is NOT independent proof of transcription.
-
-Piece IDs P0..P8 refer to the photographed INITIAL-state 3x3 grid, row-major.
-Each four-entry tuple records image half-IDs in (North, East, South, West)
-order. Each move can rotate a tile clockwise 0, 90, 180 or 270 degrees.
-Complementary pairs are (0,1), (2,3), (4,5), (6,7).
-Only internal touching edges must match. Outer border edges are unrestricted.
-
-Symbol key:
-  0 astronaut head/upper half          1 astronaut legs/lower half
-  2 space shuttle nose/front half      3 space shuttle wing/rear half
-  4 satellite capped/end half          5 satellite body half
-  6 moon A half                        7 moon B half
-
-The reference goal is used ONLY as an independent reporting/sanity check;
-neither search routine uses it or knows its positions or rotations.
+"""
+EECS 649 - Assignment 3 - Problem 8
+3D Squares Puzzle Solver
+Goal:
+    Find an arrangement of nine square puzzle pieces on a 3x3 board.
+    Adjacent picture halves must match and each piece can rotate 0, 90,
+    180, or 270 degrees clockwise. Pieces cannot be flipped.
+This program:
+    1. Stores the nine pieces using four edge labels per piece.
+    2. Solves the puzzle with uninformed Depth-First Search (DFS).
+    3. Solves it again using informed Greedy Best-First Search.
+    4. Verifies that the result uses every piece once and matches edges.
+    5. Compares search time, Python-traced memory, and search states.
+    6. Prints the final arrangements and results in the terminal.
+Note about the input:
+    The piece numbers were estimated from the assignment photographs.
+    The two moon halves are especially hard to distinguish. The code
+    verifies the entered edge labels, NOT the original photo itself.
+    Verify the nine tuples against clearer piece images before claiming
+    the actual photographed puzzle has been independently solved.
+Note about viewing the search:
+    This version prints the final results. It is not a live, step-by-step
+    animation of every move.
 """
 
-import heapq
-import platform
-import time
-import tracemalloc
-from itertools import count
 
-SIZE = 3
-NUM_CELLS = SIZE * SIZE
+# These are built-in Python libraries, so no extra installation is needed.
+import heapq          # Priority queue: pick the lowest heuristic score first.
+import platform       # Show the Python version and the computer platform.
+import time           # Measure how long each algorithm takes to finish.
+import tracemalloc    # Measure memory allocations tracked by Python.
+from itertools import count  # Provide a unique number for equal heap scores.
 
-# Candidate transcription; verify moon A/B visually before claiming ground truth.
+
+# ================================================================
+
+# PART 1 - PUZZLE SETUP
+# ================================================================
+# The board has 3 rows and 3 columns. A board position is one cell.
+# Cell positions are numbered 0 through 8 from left to right, top to bottom.
+SIZE = 3                   # Number of rows and columns.
+NUM_CELLS = SIZE * SIZE   # Total number of spaces on the board: 9.
+
+# Each tile has 4 numbers in the order (North, East, South, West).
+# The number tells us which HALF of an image appears on that edge.
+# Pairs of matching halves have consecutive numbers:
+#   0/1 = astronaut, 2/3 = space shuttle,
+#   4/5 = satellite, 6/7 = moon.
+# For example: (6, 5, 4, 3) means north=moon half A, east=satellite body,
+# south=satellite end, and west=shuttle rear.
+#
+# P0 to P8 are the 9 pieces in the ORIGINAL photograph, left to right,
+# top to bottom. A piece ID is not the same thing as its final position.
+#
+# These are CANDIDATE labels based on the photograph, not confirmed data.
+# In particular, P3 and P7 currently have the same labels; check them
+# against the original pieces before making claims about the real puzzle.
 #                     N  E  S  W
 PIECES = [
     (6, 5, 4, 3),   # P0: moon A, satellite body, satellite end, shuttle rear
@@ -50,8 +68,11 @@ PIECES = [
     (4, 7, 3, 1),   # P8: satellite end, moon B, shuttle rear, astronaut legs
 ]
 
-# Inferred from the original page's example GOAL photograph, NOT from search.
-# The second number is clockwise quarter-turns relative to the initial photo.
+# This arrangement is our interpretation of the example goal photograph.
+# Each pair is (piece ID, clockwise QUARTER TURNS from its original view).
+# For example, (0, 3) = piece P0 rotated 3 x 90 = 270 degrees clockwise.
+# Important: DFS and Greedy NEVER use this reference to decide where to move.
+# It is printed afterward only as a comparison, not as a search shortcut.
 PHOTO_REFERENCE = (
     (2, 0), (0, 3), (6, 1),
     (3, 2), (5, 2), (1, 0),
@@ -60,9 +81,15 @@ PHOTO_REFERENCE = (
 
 
 def validate_pieces(pieces):
-    """Fail early if the symbolic input is incomplete or malformed."""
+    """Check that the puzzle contains exactly nine valid four-edge pieces.
+
+    This catches missing or incorrectly formatted inputs before searching.
+    Valid edge labels must be whole numbers between 0 and 7.
+    """
+    # The assignment is a 3x3 puzzle, so it must contain nine tiles.
     if len(pieces) != NUM_CELLS:
         raise ValueError(f"Expected {NUM_CELLS} pieces; received {len(pieces)}.")
+    # Check each piece one by one. enumerate() gives the piece number.
     for i, piece in enumerate(pieces):
         if len(piece) != 4 or any(type(edge) is not int or edge not in range(8)
                                   for edge in piece):
@@ -70,215 +97,340 @@ def validate_pieces(pieces):
 
 
 def complements(a, b):
-    """Check complementary edge IDs under the paired encoding."""
+    """Return True if edge a fits edge b (for example, 4 matches 5).
+
+    The ^ operator is bitwise XOR, NOT an exponent. XOR with 1 changes
+    only the last bit: 0 becomes 1, 1 becomes 0, 2 becomes 3, etc.
+    That is a short way to check the four matching pairs.
+    """
     return (a ^ 1) == b
 
 
 def rotate(piece, quarter_turns=0):
-    """Return (N, E, S, W) after clockwise quarter turns."""
+    """Return the new four edges after rotating a tile clockwise.
+
+    For 1 turn, the old West edge becomes North, North becomes East,
+    East becomes South, and South becomes West.
+    """
+    # Modulo 4 handles extra turns (4 turns brings us back to the start).
     r = quarter_turns % 4
+    # Rotate the edge tuple by moving its last r entries to the front.
     return piece[-r:] + piece[:-r] if r else piece
 
 
 def oriented_piece(piece_id, rotation):
-    """Return the four oriented edges of the selected tile."""
+    """Look up a piece by ID, then return its edges after rotation.
+
+    This lets the matching functions consider all possible directions.
+    """
     return rotate(PIECES[piece_id], rotation)
 
 
 def initial_state():
-    """A state is (immutable board, frozenset of unused piece IDs)."""
+    """Build the first search state, before any tile is placed.
+
+    A state has TWO parts:
+        board: a tuple of 9 slots, initially all None (empty)
+        unused: a frozenset of piece IDs P0..P8 that remain available
+    Tuples and frozensets cannot be changed in place, which prevents
+    one search branch from accidentally changing another branch.
+    """
     validate_pieces(PIECES)
     return (None,) * NUM_CELLS, frozenset(range(NUM_CELLS))
 
 
 def legal(board, cell, oriented_edges):
-    """Check compatibility with already placed neighbors north and west."""
+    """Decide whether a rotated piece fits in a chosen board position.
+
+    Since we fill the board LEFT TO RIGHT and TOP TO BOTTOM, only its
+    left (west) and above (north) neighbors can already be occupied.
+    Its other neighbors will be checked later when we place those tiles.
+    """
+    # Reject invalid cell numbers and cells that already contain a tile.
     if not (0 <= cell < NUM_CELLS) or board[cell] is not None:
         return False
+    # divmod(4, 3) gives (1, 1): board index 4 is row 1, column 1.
     row, col = divmod(cell, SIZE)
-
+    # If the cell is not in the first column, check the LEFT tile.
     if col > 0 and board[cell - 1] is not None:
         left_id, left_rotation = board[cell - 1]
         left_edges = oriented_piece(left_id, left_rotation)
+        # Edge index 1 is East; index 3 is West.
+        # These sides touch and need complementary image halves.
         if not complements(left_edges[1], oriented_edges[3]):
             return False
-
+    # If the cell is not in the first row, check the tile ABOVE it.
     if row > 0 and board[cell - SIZE] is not None:
         top_id, top_rotation = board[cell - SIZE]
         top_edges = oriented_piece(top_id, top_rotation)
+        # Edge index 2 is South; index 0 is North.
         if not complements(top_edges[2], oriented_edges[0]):
             return False
     return True
 
 
 def verify(board):
-    """Verify all 9 tiles appear once and all 12 shared boundaries match."""
+    """Check an entire solved board independently of the search.
+
+    We require all nine board slots to be filled, each piece ID used once,
+    and all twelve INTERNAL joins to match:
+        6 horizontal joins + 6 vertical joins = 12.
+    We do NOT require matching images around the outer border.
+    This checks consistency with the entered numbers, not whether those
+    numbers were transcribed correctly from the photographed pieces.
+    """
+    # A complete solution cannot contain a missing tile.
     if len(board) != NUM_CELLS or any(slot is None for slot in board):
         return False
     try:
+        # Extract each ID; a physical puzzle piece cannot be used twice.
         ids = [piece_id for piece_id, _ in board]
         if set(ids) != set(range(NUM_CELLS)) or len(set(ids)) != NUM_CELLS:
             return False
+        # Walk through the full board and test each right/bottom neighbor.
         for cell, (piece_id, rotation) in enumerate(board):
             edges = oriented_piece(piece_id, rotation)
             row, col = divmod(cell, SIZE)
+            # Compare this tile's EAST edge to the next tile's WEST edge.
             if col + 1 < SIZE:
                 right_id, right_rotation = board[cell + 1]
                 right_edges = oriented_piece(right_id, right_rotation)
                 if not complements(edges[1], right_edges[3]):
                     return False
+            # Compare this tile's SOUTH edge to the tile below's NORTH.
             if row + 1 < SIZE:
                 bottom_id, bottom_rotation = board[cell + SIZE]
                 bottom_edges = oriented_piece(bottom_id, bottom_rotation)
                 if not complements(edges[2], bottom_edges[0]):
                     return False
+    # If a board entry is malformed, reject it instead of crashing.
     except (IndexError, KeyError, TypeError, ValueError):
         return False
     return True
 
 
 def goal(state):
-    """Accept any completed, consistently edge-matched arrangement."""
+    """A goal uses all nine tiles and passes verify().
+
+    A solution does NOT have to be identical to PHOTO_REFERENCE because
+    a matching picture puzzle can have multiple valid arrangements.
+    """
     board, unused = state
     return not unused and verify(board)
 
 
 def next_empty_cell(state):
-    """Return the first empty location in row-major order, or None."""
+    """Find the first empty position, reading left-to-right, top-to-bottom.
+
+    Returning None means that every board slot is already filled.
+    """
     board, unused = state
     return next((i for i, slot in enumerate(board) if slot is None), None)
 
 
 def place(state, cell, piece_id, rotation):
-    """Produce a new immutable state with one legal piece placement."""
+    """Make a copy of the board after adding a tile and its rotation.
+
+    Check that the piece is unused and fits, store (piece ID, rotation),
+    and remove that ID from the unused set. The original state is kept.
+    """
     board, unused = state
     if piece_id not in unused or not legal(board, cell, oriented_piece(piece_id, rotation)):
         raise ValueError("Piece was already used or does not fit this cell")
+    # Tuples cannot be edited directly, so make a temporary list.
     updated = list(board)
     updated[cell] = (piece_id, rotation % 4)
+    # Convert back to a tuple and mark this piece as used.
     return tuple(updated), unused - {piece_id}
 
 
 def path_cost(state):
-    """Each placed tile contributes a unit path cost."""
+    """Return the number of pieces placed so far.
+
+    Every placement costs one move, so a complete board has cost 9.
+    """
     return NUM_CELLS - len(state[1])
+# ------------------------------------------------------------
+# TODO 1 COMPLETED - Generate the next possible puzzle arrangements.
+# A successor means the current board after adding exactly one legal tile.
+# ------------------------------------------------------------
 
 
-# ------------------------------------------------------------
-# TODO 1 completed: successor generation.
-# ------------------------------------------------------------
 def successors(state):
-    """Yield each legal unused-piece/rotation placement for the next cell."""
+    """Create all legal one-move successors of a partial board.
+
+    yield returns one new state at a time, so the caller can iterate over
+    them without this function having to store all states itself.
+    """
     board, unused = state
     cell = next_empty_cell(state)
+    # A full board has no more successor placements.
     if cell is None:
         return
-
+    # Use a repeatable order of piece IDs so the same data gives
+    # the same DFS search order (and comparable search-state counts).
     for piece_id in sorted(unused):
+        # Try this tile with 0, 90, 180, and 270 degree rotations.
         for rotation in range(4):
             if legal(board, cell, oriented_piece(piece_id, rotation)):
+                # Make a separate state containing this possible placement.
                 yield place(state, cell, piece_id, rotation)
+# ------------------------------------------------------------
+# TODO 2 COMPLETED - Uninformed search with Depth-First Search (DFS).
+# DFS follows a possible path until it ends, then returns to another path.
+# It does not use the heuristic. Its frontier is a LIFO stack.
+# ------------------------------------------------------------
 
 
-# ------------------------------------------------------------
-# TODO 2 completed: uninformed Depth-First Search.
-# ------------------------------------------------------------
 def uninformed_search(start, stats=None):
-    """Find a valid goal via DFS; stats records expansions and frontier size."""
-    if stats is None:
-        stats = {}
-    stats.update(expanded=0, generated=0, max_frontier=1)
-    frontier = [start]
+    """Solve the puzzle with a stack (last in, first out).
 
+    stats records:
+      expanded: states we removed from the stack and expanded
+      generated: legal child states produced by successors()
+      max_frontier: largest number of states waiting in the stack
+    No visited set is needed in THIS row-by-row formulation: each new
+    state places a different unused piece in the next fixed empty cell.
+    Therefore each exact partial board has only one placement history.
+    """
+    if stats is None:
+        # Each algorithm gets its OWN counters; nothing is reused.
+        stats = {}
+    # Set all counters to zero for this new search run.
+    stats.update(expanded=0, generated=0, max_frontier=1)
+    # A Python list works as the DFS stack. Start with the empty board.
+    frontier = [start]
     while frontier:
+        # pop() removes the most recently added waiting state.
         state = frontier.pop()
+        # Stop as soon as a fully matching arrangement is found.
         if goal(state):
             return state
         stats['expanded'] += 1  # Count states whose successors we actually expand.
+        # Generate all legal moves from the selected partial board.
         children = list(successors(state))
         stats['generated'] += len(children)
+        # Reverse them before stacking so the first generated move gets
+        # explored first; DFS then follows that move's descendants.
         frontier.extend(reversed(children))
         stats['max_frontier'] = max(stats['max_frontier'], len(frontier))
-
     return None
+# ------------------------------------------------------------
+# TODO 3 COMPLETED - Heuristic (a score to guide informed search).
+# Greedy explores whichever available state has the lowest score.
+# This heuristic is our chosen design; it was not supplied by Python.
+# ------------------------------------------------------------
 
 
-# ------------------------------------------------------------
-# TODO 3 completed: heuristic for Greedy Best-First Search.
-# ------------------------------------------------------------
 def heuristic(state):
-    """Lower priority scores are explored earlier.
+    """Give a partial board a priority score (lower means better).
 
-    h = unused tiles + 1/(1 + legal choices for the next cell).
-    Dead ends have infinite cost, completed goals have score zero.
-    At equal depth, MORE available choices are preferred; this is not MRV.
-    It is a Greedy ranking score, NOT an admissible A* heuristic because
-    it can exceed the number of remaining placement steps.
+    Let u = unused pieces and c = legal moves for the next empty cell.
+        h(state) = u + 1 / (1 + c)
+    Fewer remaining pieces are preferred. At the same depth, having more
+    immediate next choices gives a slightly LOWER score.
+    This does NOT guarantee a solution; it is only a useful ranking rule.
+    Return 0 for a solved board and infinity for a proven dead end.
+    This is NOT A*: A* uses g + h, while our Greedy search uses only h.
+    This is also NOT the minimum-remaining-values (MRV) heuristic.
+    Since our score can exceed remaining steps, it is not admissible A* h.
     """
+    # A real completed solution gets the best possible priority.
     if goal(state):
         return 0.0
-
     board, unused = state
     cell = next_empty_cell(state)
+    # A completely filled board that failed goal() cannot be repaired.
     if cell is None or not unused:
         return float('inf')
-
+    # Check how many piece-and-rotation options fit the NEXT position.
     choices = 0
     for piece_id in sorted(unused):
         for rotation in range(4):
             if legal(board, cell, oriented_piece(piece_id, rotation)):
                 choices += 1
-
+    # If no candidate fits the next required cell, this branch stops here.
     if choices == 0:
         return float('inf')
+    # 1/(1+c) gets smaller when c gets bigger; this breaks ties at depth.
     return len(unused) + 1.0 / (1 + choices)
+# ------------------------------------------------------------
+# TODO 4 COMPLETED - Informed search using Greedy Best-First.
+# Instead of a stack, we use a priority queue to rank candidate boards.
+# ------------------------------------------------------------
 
 
-# ------------------------------------------------------------
-# TODO 4 completed: informed Greedy Best-First Search.
-# ------------------------------------------------------------
 def informed_search(start, h, stats=None):
-    """Find a goal via Greedy priority h(s), breaking ties by insertion order."""
+    """Solve the puzzle by exploring the waiting state with lowest h.
+
+    heapq implements a min-heap: the smallest score comes out first.
+    A unique counter handles tied scores; otherwise Python might attempt
+    to compare states containing both None and tuples and raise TypeError.
+    No visited set is needed for the same fixed-order state reason as DFS.
+    """
     if stats is None:
         stats = {}
     stats.update(expanded=0, generated=0, max_frontier=1)
+    # Score the starting empty board before putting it in the heap.
     first_score = h(start)
     if first_score == float('inf'):
         return None
+    # Give each entry a unique sequence number to break equal-score ties.
     tie_breaker = count()
+    # Heap items are (score, unique sequence number, actual board state).
     frontier = [(first_score, next(tie_breaker), start)]
-
     while frontier:
+        # Remove the currently best-scoring state from the heap.
+        # The underscores mean we do not need those two numbers here.
         _, _, state = heapq.heappop(frontier)
         if goal(state):
             return state
         stats['expanded'] += 1  # Goal check alone is not an expansion.
-
+        # Consider each legal one-tile placement from this state.
         for child in successors(state):
             stats['generated'] += 1
+            # Calculate how promising the new partial board looks.
             score = h(child)
             if score == float('inf'):
                 continue  # next cell has no legal option; proven dead-end
+            # Queue the child to be explored later in priority order.
             heapq.heappush(frontier, (score, next(tie_breaker), child))
         stats['max_frontier'] = max(stats['max_frontier'], len(frontier))
     return None
 
 
 def measure(search_fn, *args):
-    """Measure wall time and peak Python-traced heap memory (not process RSS)."""
+    """Run a search and record elapsed time plus traced peak memory.
+
+    perf_counter() measures elapsed seconds using a precise clock.
+    tracemalloc records Python-managed memory allocations in bytes;
+    this is NOT total RAM usage, process RSS, or a theoretical space bound.
+    Tracking allocations also adds overhead to the timing measurement.
+    """
+    # Start tracking allocations for this search only.
     tracemalloc.start()
     try:
+        # Start the timer immediately before calling the search function.
         start_time = time.perf_counter()
+        # *args passes the chosen search its start state and other inputs.
         result = search_fn(*args)
         seconds = time.perf_counter() - start_time
+        # The second value is the highest traced memory during this run.
         _, peak_bytes = tracemalloc.get_traced_memory()
     finally:
+        # Always stop tracing even if a search reports an error.
         tracemalloc.stop()
+    # Convert bytes to MiB using 1024 x 1024 bytes per MiB.
     return result, seconds, peak_bytes / (1024 * 1024)
 
 
 def display_board(board):
-    """Print piece ID and clockwise rotation degrees in the 3x3 layout."""
+    """Print the board in three readable rows.
+
+    Example output P2 @ 90° means piece 2 is rotated 90° clockwise.
+    Rotations are stored as quarter turns (0,1,2,3); multiply by 90
+    to display the angle in degrees.
+    """
     for row in range(SIZE):
         cells = board[row * SIZE:(row + 1) * SIZE]
         print(' | '.join('empty' if item is None else
@@ -286,31 +438,47 @@ def display_board(board):
 
 
 def reference_goal_state():
-    """Read the photo's proposed goal placement for validation only."""
+    """Build a state for the interpreted reference goal (helper only).
+
+    This helper is not called by the current experiment. The search uses
+    only the starting state and the numerical edge labels.
+    """
     return PHOTO_REFERENCE, frozenset()
 
 
 def main():
-    """Run both methods independently on the same starting board."""
+    """Run DFS and Greedy separately, verify them, and compare results.
+
+    Each algorithm starts from the same immutable empty-board state.
+    Runtime and memory values may change with the computer or each run.
+    The terminal prints progress/results, but not every intermediate move.
+    """
+    # Make the empty 3x3 board and list of all unused piece IDs.
     start = initial_state()
     print('EECS 649 Assignment 3 — Problem 8: 3D Squares')
     print('Python:', platform.python_version())
     print('Platform:', platform.platform())
     print('DATA STATUS: proposed visual transcription; moon halves need verification')
     print('\nPhotographed goal arrangement (inferred, NOT used by searches):')
+    # Show the reference for human comparison only.
+    # The reference isn't passed to either search algorithm.
     display_board(PHOTO_REFERENCE)
+    # This tests matching according to PIECES; it cannot verify the photo.
     print('Internal seams pass the candidate encoding:', verify(PHOTO_REFERENCE))
     print('\nInitial search state:')
     display_board(start[0])
-
+    # Save summary results so we can print them together at the end.
     results = []
+    # Use DFS first, then Greedy. Greedy gets the heuristic as an input.
     for name, search_fn, extra_args in [
         ('DFS', uninformed_search, ()),
         ('Greedy Best-First', informed_search, (heuristic,)),
     ]:
         print(f'\nRunning {name} ...', flush=True)
         stats = {}
+        # Measure the selected algorithm's solution, seconds, and memory.
         solution, seconds, peak_mib = measure(search_fn, start, *extra_args, stats)
+        # A valid solution must exist and pass the program's goal check.
         verified = solution is not None and goal(solution)
         if solution is None:
             print('No solution found for these input labels.')
@@ -320,12 +488,14 @@ def main():
             print('Verified edge-matching solution:')
             display_board(solution[0])
             print('Tiles placed:', path_cost(solution))
+            # False here can still mean a VALID solution, because the solver
+            # accepts any edge-matching arrangement, not only this photo layout.
             print('Matches photographed reference arrangement:', solution[0] == PHOTO_REFERENCE)
         print(f'Time: {seconds:.6f} seconds')
         print(f'Peak traced Python memory: {peak_mib:.6f} MiB')
         print(f'States expanded: {stats["expanded"]}, generated: {stats["generated"]}')
         results.append((name, verified, seconds, peak_mib, stats))
-
+    # Compare success, time, memory, and search expansions side by side.
     print('\nSummary')
     print(f'{"Method":<20} {"Valid":<7} {"Seconds":>12} {"Peak MiB":>12} {"Expanded":>9}')
     print('-' * 69)
@@ -336,5 +506,7 @@ def main():
     print('Timings and memory can change when you rerun on your MacBook.')
 
 
+# Python runs main() when we execute this file directly in the terminal.
+# Importing this file into another Python program would not run main().
 if __name__ == '__main__':
     main()

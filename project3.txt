@@ -1,0 +1,42 @@
+Layer 1: Presentation
+
+3 components — what users see and interact with
+
+
+1. Login Interface
+
+2. Student Interface
+
+3. Staff Interface
+
+
+
+
+Layer 2: Business Logic
+
+6 components — what the system does
+
+
+1. User and Access Management
+
+2. Equipment Management
+
+3. Reservation Management
+
+4. Loan Management (checkouts, returns, due dates)
+
+5. Maintenance and Damage Management
+
+6. Messaging and Notifications
+
+
+
+
+Layer 3: Data Access
+
+1 component — how the system accesses stored data
+
+
+1. Data Access Component
+
+Reads and updates records in SQLite using SQL queries.

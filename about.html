@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}About{% endblock %}
+{% block content %}
+<section class="page-header"><div class="shell">
+  <span class="eyebrow">CampusGear / About</span>
+  <h1>Shared campus equipment, simplified.</h1>
+  <p>CampusGear is Team 18's equipment borrowing project, designed to bring the student browsing experience and staff equipment workflows together.</p>
+</div></section>
+<section class="section"><div class="shell narrow-copy">
+  <h2>What we're building</h2>
+  <p>Students will be able to browse available equipment and, in later sprints, manage reservations and borrowing. Staff will be able to register and track equipment through role-appropriate tools.</p>
+  <p>This Sprint 1 website skeleton provides a shared layout and navigation. Database storage, login, privacy controls, equipment registration, and the live catalog are separate team assignments.</p>
+  <a class="button button-primary" href="{{ url_for('site.catalog') }}">Visit the catalog <span aria-hidden="true">&rarr;</span></a>
+</div></section>
+{% endblock %}

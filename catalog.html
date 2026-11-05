@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Equipment Catalog{% endblock %}
+{% block content %}
+<section class="page-header"><div class="shell">
+  <span class="eyebrow">CampusGear / Browse</span>
+  <h1>Equipment Catalog</h1>
+  <p>Find campus resources in one place. The equipment listings will be populated from the database when the catalog feature is integrated.</p>
+</div></section>
+<section class="section"><div class="shell">
+  <div class="empty-state" role="status">
+    <span class="empty-icon" aria-hidden="true">CG</span>
+    <h2>Catalog integration in progress</h2>
+    <p>The page and navigation are ready. The equipment team will connect real inventory and availability here for Requirement #3.</p>
+    <a class="button button-secondary" href="{{ url_for('site.home') }}">Back to home</a>
+  </div>
+</div></section>
+{% endblock %}

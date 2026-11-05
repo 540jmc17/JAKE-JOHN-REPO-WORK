@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Sign in{% endblock %}
+{% block content %}
+<section class="page-header"><div class="shell">
+  <span class="eyebrow">CampusGear / Account</span>
+  <h1>Student &amp; staff sign-in</h1>
+  <p>This page is reserved for the authentication feature being developed under Sprint 1 Requirement #5.</p>
+</div></section>
+<section class="section"><div class="shell">
+  <div class="empty-state" role="status">
+    <span class="empty-icon" aria-hidden="true">CG</span>
+    <h2>Secure login is coming soon</h2>
+    <p>This is a navigation-only placeholder. It does not accept credentials, establish a session, or grant access to protected pages.</p>
+    <a class="button button-secondary" href="{{ url_for('site.home') }}">Back to home</a>
+  </div>
+</div></section>
+{% endblock %}

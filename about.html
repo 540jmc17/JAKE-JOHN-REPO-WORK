@@ -1,15 +1,75 @@
+
+{# CampusGear - About Page
+
+   This file creates the About page for CampusGear.
+
+   It explains the purpose of the project and introduces
+   the equipment borrowing features being developed
+   for students and campus staff.
+
+   The page also provides a navigation button that
+   directs users to the Equipment Catalog.
+
+   This page supports Sprint 1 Requirement #4
+   by providing a working navigation destination.
+#}
+
+{# Use the shared website layout from base.html.
+   This includes the navigation menu, header, and footer. #}
 {% extends "base.html" %}
+
+{# Set the browser tab title to About. #}
 {% block title %}About{% endblock %}
+
+{# Begin the About page content. #}
 {% block content %}
-<section class="page-header"><div class="shell">
-  <span class="eyebrow">CampusGear / About</span>
-  <h1>Shared campus equipment, simplified.</h1>
-  <p>CampusGear is Team 18's equipment borrowing project, designed to bring the student browsing experience and staff equipment workflows together.</p>
-</div></section>
-<section class="section"><div class="shell narrow-copy">
-  <h2>What we're building</h2>
-  <p>Students will be able to browse available equipment and, in later sprints, manage reservations and borrowing. Staff will be able to register and track equipment through role-appropriate tools.</p>
-  <p>This Sprint 1 website skeleton provides a shared layout and navigation. Database storage, login, privacy controls, equipment registration, and the live catalog are separate team assignments.</p>
-  <a class="button button-primary" href="{{ url_for('site.catalog') }}">Visit the catalog <span aria-hidden="true">&rarr;</span></a>
-</div></section>
+
+{# PAGE HEADER
+   Displays the About page heading and briefly
+   introduces the purpose of CampusGear.
+#}
+<section class="page-header">
+  <div class="shell">
+    <span class="eyebrow">CampusGear / About</span>
+
+    <h1>Shared campus equipment, simplified.</h1>
+
+    <p>CampusGear is Team 18's equipment borrowing project, designed to bring the student browsing experience and staff equipment workflows together.</p>
+  </div>
+</section>
+
+{# PROJECT INFORMATION SECTION
+   Explains what the CampusGear team is building
+   and identifies which features are being developed
+   as separate team assignments.
+
+   The narrow-copy class limits the text width
+   to improve readability.
+#}
+<section class="section">
+  <div class="shell narrow-copy">
+
+    {# Introduces the planned website features. #}
+    <h2>What we're building</h2>
+
+    {# Describes the student and staff functionality
+       planned for CampusGear.
+    #}
+    <p>Students will be able to browse available equipment and, in later sprints, manage reservations and borrowing. Staff will be able to register and track equipment through role-appropriate tools.</p>
+
+    {# Explains the current Sprint 1 implementation
+       and which features are assigned to other teams.
+    #}
+    <p>This Sprint 1 website skeleton provides a shared layout and navigation. Database storage, login, privacy controls, equipment registration, and the live catalog are separate team assignments.</p>
+
+    {# Navigation button that opens the Equipment Catalog.
+       url_for() connects the button to the catalog route
+       defined in routes.py.
+    #}
+    <a class="button button-primary" href="{{ url_for('site.catalog') }}">Visit the catalog <span aria-hidden="true">&rarr;</span></a>
+
+  </div>
+</section>
+
+{# End of the About page content. #}
 {% endblock %}

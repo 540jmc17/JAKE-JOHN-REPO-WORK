@@ -1,17 +1,77 @@
+
+{# CampusGear - Student and Staff Login Page
+
+   This file creates the placeholder login page for CampusGear.
+
+   It provides a working navigation destination for the
+   Sign in button located in the shared navigation menu.
+
+   The actual login and authentication system will be
+   implemented by the assigned team for Requirement #5.
+
+   This page does not currently collect passwords,
+   authenticate users, or create login sessions.
+
+   This page supports Sprint 1 Requirement #4
+   by providing a working navigation destination.
+#}
+
+{# Use the shared website layout from base.html.
+   This includes the navigation menu, header, and footer. #}
 {% extends "base.html" %}
+
+{# Set the browser tab title to Sign in. #}
 {% block title %}Sign in{% endblock %}
+
+{# Begin the login page content. #}
 {% block content %}
-<section class="page-header"><div class="shell">
-  <span class="eyebrow">CampusGear / Account</span>
-  <h1>Student &amp; staff sign-in</h1>
-  <p>This page is reserved for the authentication feature being developed under Sprint 1 Requirement #5.</p>
-</div></section>
-<section class="section"><div class="shell">
-  <div class="empty-state" role="status">
-    <span class="empty-icon" aria-hidden="true">CG</span>
-    <h2>Secure login is coming soon</h2>
-    <p>This is a navigation-only placeholder. It does not accept credentials, establish a session, or grant access to protected pages.</p>
-    <a class="button button-secondary" href="{{ url_for('site.home') }}">Back to home</a>
+
+{# PAGE HEADER
+   Displays the login page title and explains that
+   authentication is being developed separately.
+#}
+<section class="page-header">
+  <div class="shell">
+
+    <span class="eyebrow">CampusGear / Account</span>
+
+    <h1>Student &amp; staff sign-in</h1>
+
+    <p>This page is reserved for the authentication feature being developed under Sprint 1 Requirement #5.</p>
+
   </div>
-</div></section>
+</section>
+
+{# LOGIN PLACEHOLDER SECTION
+   Displays a temporary message explaining that
+   secure login functionality has not yet been added.
+
+   The role="status" attribute identifies this area
+   as status information for assistive technologies.
+#}
+<section class="section">
+  <div class="shell">
+    <div class="empty-state" role="status">
+
+      {# Decorative CampusGear icon displayed above the message. #}
+      <span class="empty-icon" aria-hidden="true">CG</span>
+
+      {# Inform users that secure login is still being developed. #}
+      <h2>Secure login is coming soon</h2>
+
+      {# Explain that this page is currently for navigation only.
+         No user credentials or login sessions are handled here.
+      #}
+      <p>This is a navigation-only placeholder. It does not accept credentials, establish a session, or grant access to protected pages.</p>
+
+      {# Navigation button that returns users to the homepage.
+         url_for() connects to the home route in routes.py.
+      #}
+      <a class="button button-secondary" href="{{ url_for('site.home') }}">Back to home</a>
+
+    </div>
+  </div>
+</section>
+
+{# End of the login page content. #}
 {% endblock %}

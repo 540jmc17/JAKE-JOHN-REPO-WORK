@@ -1,17 +1,69 @@
+
+{# CampusGear - Equipment Catalog Page
+
+   This file creates the Equipment Catalog page for CampusGear.
+
+   It provides the page layout and navigation for users to
+   access the equipment catalog.
+
+   The actual equipment listings and database integration
+   will be implemented by the equipment team for
+   Sprint 1 Requirement #3.
+
+   This page supports Requirement #4 by providing a
+   working navigation destination.
+#}
+
+{# Use the shared website layout from base.html. #}
 {% extends "base.html" %}
+
+{# Set the browser tab title to Equipment Catalog. #}
 {% block title %}Equipment Catalog{% endblock %}
+
+{# Begin the Equipment Catalog page content. #}
 {% block content %}
-<section class="page-header"><div class="shell">
-  <span class="eyebrow">CampusGear / Browse</span>
-  <h1>Equipment Catalog</h1>
-  <p>Find campus resources in one place. The equipment listings will be populated from the database when the catalog feature is integrated.</p>
-</div></section>
-<section class="section"><div class="shell">
-  <div class="empty-state" role="status">
-    <span class="empty-icon" aria-hidden="true">CG</span>
-    <h2>Catalog integration in progress</h2>
-    <p>The page and navigation are ready. The equipment team will connect real inventory and availability here for Requirement #3.</p>
-    <a class="button button-secondary" href="{{ url_for('site.home') }}">Back to home</a>
+
+{# PAGE HEADER
+   Displays the title and introduction to the catalog.
+   The shared CSS controls the header's appearance.
+#}
+<section class="page-header">
+  <div class="shell">
+    <span class="eyebrow">CampusGear / Browse</span>
+
+    <h1>Equipment Catalog</h1>
+
+    <p>Find campus resources in one place. The equipment listings will be populated from the database when the catalog feature is integrated.</p>
   </div>
-</div></section>
+</section>
+
+{# CATALOG PLACEHOLDER
+   This section displays a temporary message until
+   the equipment team connects real inventory data.
+
+   The role="status" attribute identifies this section
+   as a status message for assistive technologies.
+#}
+<section class="section">
+  <div class="shell">
+    <div class="empty-state" role="status">
+
+      {# Decorative CampusGear icon displayed above the message. #}
+      <span class="empty-icon" aria-hidden="true">CG</span>
+
+      {# Inform users that catalog integration is in progress. #}
+      <h2>Catalog integration in progress</h2>
+
+      <p>The page and navigation are ready. The equipment team will connect real inventory and availability here for Requirement #3.</p>
+
+      {# Navigation button that returns users to the homepage.
+         url_for() connects to the home route in routes.py.
+      #}
+      <a class="button button-secondary" href="{{ url_for('site.home') }}">Back to home</a>
+
+    </div>
+  </div>
+</section>
+
+{# End of the Equipment Catalog page content. #}
 {% endblock %}

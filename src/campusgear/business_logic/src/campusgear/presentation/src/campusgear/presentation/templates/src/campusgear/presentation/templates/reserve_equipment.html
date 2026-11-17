@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Reserve {{ equipment.name }}{% endblock %}
+{% block content %}
+<section class="page-header">
+  <div class="shell">
+    <h1>Reserve {{ equipment.name }}</h1>
+    <p>Asset ID {{ equipment.asset_id }}</p>
+  </div>
+</section>
+<section class="section">
+  <div class="shell">
+    <div class="auth-card wide-card">
+      {# Show the validation message when the server returns the form. #}
+      {% if error %}<p class="alert alert-error" role="alert">{{ error }}</p>{% endif %}
+      <form method="post" action="{{ url_for('student.reserve_equipment', equipment_id=equipment.id) }}">
+        {# Submit the session token that the route checks. #}
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-field">
+          {# Use a native date picker and keep the previous value after an error. #}
+          <label for="start_date">Start date</label>
+          <input type="date" id="start_date" name="start_date" required
+                 min="{{ today }}" value="{{ form.get('start_date', '') }}">
+        </div>
+        <div class="form-field">
+          <label for="end_date">End date</label>
+          <input type="date" id="end_date" name="end_date" required
+                 min="{{ today }}" value="{{ form.get('end_date', '') }}"
+                 aria-describedby="date-range-help">
+          {# The server checks that the end date comes after the start date. #}
+          <p id="date-range-help">Choose an end date after the start date.</p>
+        </div>
+        <button type="submit" class="button button-primary">Reserve equipment</button>
+        <a class="button button-secondary" href="{{ url_for('site.catalog') }}">Back to catalog</a>
+      </form>
+    </div>
+  </div>
+</section>
+{% endblock %}
